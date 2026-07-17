@@ -14,15 +14,15 @@
 
   const { PAYLINES, SYMBOLS, FEATURE_TRIGGER_RATE, evaluateGrid, makeMixedWinGrid } = window.CoelhoMath;
   const REEL_LAYOUT = [
-    { x: 69, y: 580, w: 202, h: 645, rows: 3, cellH: 215 },
-    { x: 289, y: 522, w: 202, h: 740, rows: 4, cellH: 185 },
-    { x: 509, y: 580, w: 202, h: 645, rows: 3, cellH: 215 },
+    { x: 69, y: 535, w: 202, h: 645, rows: 3, cellH: 215 },
+    { x: 289, y: 477, w: 202, h: 740, rows: 4, cellH: 185 },
+    { x: 509, y: 535, w: 202, h: 645, rows: 3, cellH: 215 },
   ];
   const LINE_RAILS = {
     left: [2, 3, 1, 6, 7, 4, 5, 10, 8, 9],
     right: [2, 4, 1, 6, 8, 3, 5, 10, 7, 9],
   };
-  const LINE_RAIL_Y = [610, 665, 720, 805, 860, 915, 970, 1070, 1125, 1180];
+  const LINE_RAIL_Y = [565, 620, 675, 760, 815, 870, 925, 1025, 1080, 1135];
   const ASSET_PATHS = {
     sky: 'assets/layout-v2/clean/ceu.jpg',
     houseLeft: 'assets/layout-v2/clean/casa_left_estatica.png',
@@ -622,18 +622,18 @@
       const now = performance.now();
       this.paylinePreviewStart = now;
       this.paylinePreviewUntil = now + 2800;
-      this.enqueuePanel(`${this.level} ${this.level === 1 ? 'LINHA ATIVA' : 'LINHAS ATIVAS'} • APOSTA ${money(this.bet)}`, 'center', 3000);
+      this.enqueuePanel(`10 LINHAS ATIVAS • APOSTA ${money(this.bet)}`, 'center', 3000);
     }
 
     getPaylinePreview(time) {
-      if (this.state !== 'IDLE' || time >= this.paylinePreviewUntil) return { active: false, alpha: 0, count: this.level };
+      if (this.state !== 'IDLE' || time >= this.paylinePreviewUntil) return { active: false, alpha: 0, count: 10 };
       const elapsed = time - this.paylinePreviewStart;
       const remaining = this.paylinePreviewUntil - time;
       const alpha = clamp(elapsed / 250, 0, 1) * clamp(remaining / 550, 0, 1);
       return {
         active: true,
         alpha,
-        count: this.level,
+        count: 10,
       };
     }
 
@@ -918,7 +918,9 @@
     draw(time) {
       const ctx = this.ctx;
       this.renderTime = time;
-      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      ctx.scale(1166 / 780, 2434 / 1688);
+      ctx.clearRect(0, 0, 780, 1688);
       this.hitAreas = [];
       this.drawBackground(time);
       this.drawHeader(time);
@@ -941,6 +943,7 @@
         this.hitAreas = [];
         this.drawOpeningOverlay(time);
       }
+      ctx.restore();
     }
 
     drawBackground(time) {
@@ -973,7 +976,7 @@
       } else {
         const idleFrame = this.getIdleMascotFrame(time);
         ctx.save();
-        ctx.translate(390, 438 + mascotBob);
+        ctx.translate(390, 393 + mascotBob);
         ctx.rotate(mascotLean);
         if (mascotWinning) {
           ctx.shadowColor = '#ffd85e';
@@ -984,7 +987,6 @@
       }
       this.drawImageContain(ASSETS.logo, 390, 140, 455, 255);
       this.drawAmbientWisps(time);
-
       if (this.activeFeatureSpin || this.featureRemaining > 0 || this.state.startsWith('FEATURE_')) {
         const fortune = ctx.createRadialGradient(390, 820, 30, 390, 820, 760);
         fortune.addColorStop(0, '#ffd74a42');
@@ -1002,7 +1004,7 @@
       [0, 1].forEach((side) => {
         const direction = side ? -1 : 1;
         const baseX = side ? 650 : 130;
-        const baseY = 470 + Math.sin(time * 0.0007 + side * 2) * 16;
+        const baseY = 425 + Math.sin(time * 0.0007 + side * 2) * 16;
         for (let puff = 0; puff < 4; puff += 1) {
           const travel = (time * 0.008 + puff * 33 + side * 19) % 120;
           const x = baseX + direction * travel;
@@ -1067,7 +1069,7 @@
       const sway = Math.sin(elapsed * 0.012) * 0.025;
       const ctx = this.ctx;
       ctx.save();
-      ctx.translate(390, 405 + jump);
+      ctx.translate(390, 360 + jump);
       ctx.rotate(sway);
       ctx.scale(appear, appear);
       ctx.shadowColor = '#ffd75b';
@@ -1139,7 +1141,7 @@
       const left = side === 'left';
       const house = left ? ASSETS.houseLeft : ASSETS.houseRight;
       const lantern = left ? ASSETS.lanternLeft : ASSETS.lanternRight;
-      const rect = this.imageContainRect(house, left ? 74 : 706, 350, 190, 560);
+      const rect = this.imageContainRect(house, left ? 74 : 706, 305, 190, 560);
       if (!rect) return;
       ctx.drawImage(house, rect.x, rect.y, rect.w, rect.h);
       if (!lantern) return;
@@ -1297,7 +1299,7 @@
 
     drawReelFrame(time) {
       const ctx = this.ctx;
-      if (ASSETS.reelFrame) ctx.drawImage(ASSETS.reelFrame, 0, 495, W, 803);
+      if (ASSETS.reelFrame) ctx.drawImage(ASSETS.reelFrame, 0, 450, W, 803);
       else REEL_LAYOUT.forEach((reel) => this.roundRect(reel.x, reel.y, reel.w, reel.h, 14, '#17195d', '#f5b95e', 6));
     }
 
@@ -1341,10 +1343,9 @@
       const h = reel.cellH - 8;
       const cx = x + w / 2;
       const cy = y + h / 2;
-      const phase = this.renderTime * 0.0022 + reel.index * 1.7 + row * 0.83;
-      const bob = moving ? 0 : Math.sin(phase) * 2.2;
-      const breathe = moving ? 1 : 1 + Math.sin(phase * 0.74) * 0.012;
-      const tilt = moving ? 0 : Math.sin(phase * 0.61) * 0.008;
+      const bob = 0;
+      const breathe = 1;
+      const tilt = 0;
       ctx.save();
       ctx.globalAlpha = alpha;
       if (moving) ctx.filter = 'blur(2.4px)';
@@ -1991,7 +1992,7 @@
       const ctx = this.ctx;
       const idleSelection = this.state === 'IDLE';
       const winningLines = idleSelection
-        ? new Set(Array.from({ length: this.level }, (_, index) => index + 1))
+        ? new Set(Array.from({ length: 10 }, (_, index) => index + 1))
         : (this.state === 'WIN' && this.result.lines.length
           ? new Set((this.lineShowAll ? this.result.lines : [this.result.lines[this.lineCycle]]).map((line) => line.index + 1))
           : new Set());
@@ -2028,7 +2029,7 @@
       return ['#25134d', '#592875', '#b14888'];
     }
 
-    drawTicker() {
+        drawTicker() {
       const ctx = this.ctx;
       const x = PANEL_X;
       const y = 1280;
@@ -2043,7 +2044,7 @@
       else this.roundRect(x, y, w, h, 18, '#30205d', '#f7b952', 4);
 
       ctx.beginPath();
-      ctx.rect(x + 25, y + 11, w - 50, h - 22);
+      ctx.rect(x + 45, y + 11, w - 90, h - 22);
       ctx.clip();
       if (isWin) {
         const palette = this.getWinPanelPalette();
@@ -2102,6 +2103,17 @@
       ctx.strokeText(displayText, 0, 0);
       ctx.fillText(displayText, 0, 0);
       ctx.restore();
+
+      // Redraw the left and right display borders on top of the text and rays
+      if (ASSETS.displayFrame) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, 60, h);
+        ctx.rect(x + w - 60, y, 60, h);
+        ctx.clip();
+        ctx.drawImage(ASSETS.displayFrame, x, y, w, h);
+        ctx.restore();
+      }
     }
 
     drawStatus() {
@@ -2443,7 +2455,7 @@
       this.roundRect(70, 955, 640, 180, 28, '#292835', '#ffffff14', 2);
       ctx.fillStyle = '#aaa9b2';
       ctx.font = '400 24px Arial';
-      ctx.fillText(`APOSTA TOTAL · ${this.level} ${this.level === 1 ? 'LINHA ATIVA' : 'LINHAS ATIVAS'}`, 390, 1015);
+      ctx.fillText('APOSTA TOTAL · 10 LINHAS ATIVAS', 390, 1015);
       ctx.fillStyle = '#ffb05b';
       ctx.font = '700 48px Arial';
       ctx.fillText(money(this.bet), 390, 1080);

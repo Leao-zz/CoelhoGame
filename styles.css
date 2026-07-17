@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  --game-ratio: 780 / 1688;
+  --game-ratio: 1166 / 2434;
 }
 
 * {
@@ -28,10 +28,10 @@ body {
 
 .game-shell {
   position: relative;
-  width: min(100vw, calc(100vh * 780 / 1688));
-  width: min(100vw, calc(100dvh * 780 / 1688));
-  height: min(100vh, calc(100vw * 1688 / 780));
-  height: min(100dvh, calc(100vw * 1688 / 780));
+  width: min(100vw, calc(100vh * 1166 / 2434));
+  width: min(100vw, calc(100dvh * 1166 / 2434));
+  height: min(100vh, calc(100vw * 2434 / 1166));
+  height: min(100dvh, calc(100vw * 2434 / 1166));
   aspect-ratio: var(--game-ratio);
   overflow: hidden;
   background: #160b2a;
@@ -84,8 +84,8 @@ body {
   }
 
   .game-shell {
-    width: min(430px, calc(100vw - 32px), calc((100vh - 32px) * 780 / 1688));
-    width: min(430px, calc(100vw - 32px), calc((100dvh - 32px) * 780 / 1688));
+    width: min(430px, calc(100vw - 32px), calc((100vh - 32px) * 1166 / 2434));
+    width: min(430px, calc(100vw - 32px), calc((100dvh - 32px) * 1166 / 2434));
     height: auto;
     aspect-ratio: var(--game-ratio);
     border-radius: 10px;

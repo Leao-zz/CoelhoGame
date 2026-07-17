@@ -8,7 +8,7 @@ const root = path.resolve(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-assert.match(html, /canvas id="gameCanvas" width="780" height="1688"/);
+assert.match(html, /canvas id="gameCanvas" width="1166" height="2434"/);
 assert.match(html, /game-core\.js/);
 assert.doesNotMatch(app, /original-site-assets|download-\d+\.png/);
 assert.match(app, /assets\/symbols-v2\/clean/);
