@@ -1,0 +1,71 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+assert.match(html, /canvas id="gameCanvas" width="780" height="1688"/);
+assert.match(html, /game-core\.js/);
+assert.doesNotMatch(app, /original-site-assets|download-\d+\.png/);
+assert.match(app, /assets\/symbols-v2\/clean/);
+assert.match(app, /assets\/layout-v2\/clean/);
+assert.match(app, /Bamboo_and_Morning_Light\.mp3/);
+assert.match(app, /musicEnabled/);
+assert.match(app, /effectsEnabled/);
+assert.match(app, /setMusicEnabled/);
+assert.match(app, /setEffectsEnabled/);
+assert.match(app, /logo_jogo\.png/);
+assert.match(app, /central_rolo_aposta\.png/);
+assert.doesNotMatch(app, /reference\/layout-v2\/base\.png/);
+assert.match(app, /0\.136/);
+assert.match(app, /loadAssets/);
+assert.match(app, /drawImage\(/);
+assert.match(app, /FEATURE_INTRO/);
+assert.match(app, /FEATURE_OUTRO/);
+assert.match(app, /\[10, 30, 50, 80, 100\]/);
+assert.match(app, /drawRulesOverlay/);
+assert.match(app, /drawHistoryOverlay/);
+assert.match(app, /drawAuthOverlay/);
+assert.match(app, /drawLineRails/);
+assert.match(app, /lineShowAll/);
+assert.match(app, /drawTicker/);
+assert.match(app, /demoMode === 'lines'/);
+assert.match(app, /demoMode === 'line1'/);
+assert.match(app, /demoMode === 'lines35'/);
+assert.match(app, /demoMode === 'prize'/);
+assert.match(app, /demoMode === 'max'/);
+assert.match(app, /SHOWCASE_MULTI_LINE_RATE/);
+assert.match(app, /panelQueue/);
+assert.match(app, /drawOpeningOverlay/);
+assert.match(app, /stopAuto/);
+assert.match(app, /drawCelebrationMascot/);
+assert.match(app, /getIdleMascotFrame/);
+assert.match(app, /assets\/idle\/clean/);
+assert.match(app, /music\.volume = 0\.15/);
+assert.doesNotMatch(app, /ASSETS\.celebration6/);
+assert.match(app, /drawWinnerSparkles/);
+assert.match(app, /PAYLINES\.slice\(0, preview\.count\)/);
+assert.match(app, /getPaylineRailPoint/);
+assert.match(app, /tracePayline\(lineNumber\)/);
+assert.match(app, /ctx\.moveTo\(left\.x, left\.y\)/);
+assert.match(app, /ctx\.lineTo\(right\.x, right\.y\)/);
+assert.ok(fs.existsSync(path.join(root, 'assets/audio/Bamboo_and_Morning_Light.mp3')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v2/clean/logo_jogo.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v2/clean/central_rolo_aposta.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/wild.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/simbolo_premio.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/12_simbolo_moeda_chinesa_esquerda.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/opening/clean/fundo_abertura.jpg')));
+assert.ok(fs.existsSync(path.join(root, 'assets/opening/clean/fundo_botao.png')));
+for (let frame = 1; frame <= 5; frame += 1) {
+  assert.ok(fs.existsSync(path.join(root, `assets/celebration/clean/animacao_ganhou${frame}.png`)));
+  assert.ok(fs.existsSync(path.join(root, `assets/idle/clean/animacao_parado${frame}.png`)));
+}
+assert.ok(fs.existsSync(path.join(root, 'server.js')));
+assert.ok(fs.existsSync(path.join(root, 'reference/layout-v2/base.png')));
+
+console.log('project: runtime original e módulos obrigatórios confirmados');

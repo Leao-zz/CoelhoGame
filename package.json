@@ -1,0 +1,11 @@
+{
+  "name": "coelho-game",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demonstração mobile original de slot com saldo fictício",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/game-core.test.js && node tests/project.test.js",
+    "simulate": "node tests/simulate.js"
+  }
+}

@@ -1,0 +1,93 @@
+:root {
+  color-scheme: dark;
+  --game-ratio: 780 / 1688;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #080510;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  font-family: Arial, Helvetica, sans-serif;
+  user-select: none;
+  touch-action: none;
+}
+
+.game-shell {
+  position: relative;
+  width: min(100vw, calc(100vh * 780 / 1688));
+  width: min(100vw, calc(100dvh * 780 / 1688));
+  height: min(100vh, calc(100vw * 1688 / 780));
+  height: min(100dvh, calc(100vw * 1688 / 780));
+  aspect-ratio: var(--game-ratio);
+  overflow: hidden;
+  background: #160b2a;
+  box-shadow: 0 0 70px #000;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #ffe8ad;
+  background: radial-gradient(circle at 50% 38%, #63265f, #170b2b 58%, #090511);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  transition: opacity 240ms ease;
+  padding-top: 8vh;
+}
+
+.loading.done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (min-width: 700px) {
+  body {
+    background:
+      radial-gradient(circle at 50% 25%, #39205a 0, transparent 42%),
+      #080510;
+  }
+
+  .game-shell {
+    width: min(430px, calc(100vw - 32px), calc((100vh - 32px) * 780 / 1688));
+    width: min(430px, calc(100vw - 32px), calc((100dvh - 32px) * 780 / 1688));
+    height: auto;
+    aspect-ratio: var(--game-ratio);
+    border-radius: 10px;
+  }
+}
