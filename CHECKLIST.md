@@ -214,10 +214,12 @@ Legenda:
 - [x] Auto-spin com opções 10/30/50/80/100.
 - [x] Contador de rodadas restantes e parada manual.
 - [x] Exibir selo `AUTO` com a quantidade restante durante o giro automático.
-- [x] Permitir interromper o automático por Girar, Auto, Menu, Turbo, Menos ou Mais.
+- [x] Permitir interromper o automático por Girar, Auto, Menu, Menos ou Mais.
+- [x] Permitir ativar/desativar Turbo durante o automático sem interromper as rodadas.
 - [x] Manter a rotação do botão Girar contínua entre giros, sem reiniciar o ângulo.
 - [x] Aplicar feedback visual de pressão em todos os controles principais.
 - [x] Exibir estado ativo/inativo do Turbo e do Auto dentro do próprio botão.
+- [x] Substituir o botão central por indicador `AUTO` distinto, centralizado e com rodadas restantes.
 - [x] Limite por queda de saldo.
 - [x] Limite por aumento de saldo.
 - [x] Limite por ganho individual.
@@ -264,6 +266,12 @@ Legenda:
 - [x] Reduzir em 50% o volume padrão da música ambiente.
 - [x] Animar nuvens lentamente, balanço das lanternas e pulsação da luz interna.
 - [x] Estilizar o painel de ganho no formato `WIN 0,30`, com texto dourado, contorno escuro e explosão.
+- [x] Misturar símbolos diferentes entre várias linhas vencedoras do mesmo giro.
+- [x] Somar o valor de `WIN` progressivamente durante a exibição de cada linha.
+- [x] Animar moedas saindo da linha marcada em direção ao painel de ganho.
+- [x] Transferir `GANHO TOTAL` para `SALDO` com contagem animada.
+- [x] Alterar a cor do painel `WIN` conforme a categoria do prêmio.
+- [x] Criar URL de teste `?demo=mixed&skipOpening=1` para vitórias mistas.
 - [x] Criar servidor local com `npm start` e documentar por que `bash python3 ...` falha.
 
 ### Validação técnica concluída

@@ -38,6 +38,11 @@ assert.deepEqual(normalGrid.map((column) => column.length), [3, 4, 3]);
 const featureGrid = core.makeGrid(true, seeded(20));
 assert.ok(featureGrid.flat().every((symbol) => symbol.type === 'prize'));
 
+const mixedGrid = core.makeMixedWinGrid(seeded(33));
+const mixedResult = core.evaluateGrid(mixedGrid, bet, lineStake);
+assert.ok(mixedResult.lines.length >= 3, 'deve criar várias linhas vencedoras no mesmo giro');
+assert.ok(new Set(mixedResult.lines.map((line) => line.base)).size >= 2, 'deve misturar símbolos entre as linhas vencedoras');
+
 const carrot = core.evaluateGrid(uniform('carrot'), bet, lineStake);
 assert.equal(carrot.lines.length, 10);
 approximately(carrot.total, 10 * core.SYMBOLS.carrot.payout * lineStake);
@@ -77,4 +82,4 @@ assert.ok(Number.isFinite(simulation.won));
 assert.ok(Number.isFinite(simulation.observedReturn));
 assert.ok(simulation.wins >= 0 && simulation.wins <= 1000);
 
-console.log('game-core: 10 testes concluídos');
+console.log('game-core: 11 testes concluídos');

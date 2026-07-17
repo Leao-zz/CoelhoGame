@@ -21,6 +21,10 @@
   };
 
   const SYMBOL_POOL = ['rabbit', 'bag', 'cards', 'coins', 'rockets', 'carrot'];
+  const MIXED_LINE_GROUPS = [
+    [0, 5, 9], [1, 6, 7], [2, 3, 8], [4, 6, 9],
+    [0, 3, 6, 9], [1, 4, 7, 8], [0, 4, 7, 9], [1, 3, 6, 8],
+  ];
   const PRIZE_RATE = 0.035;
   const WILD_RATE = 0.012;
   const FEATURE_TRIGGER_RATE = 0.00024;
@@ -49,6 +53,40 @@
       const type = randomSymbol(feature, random);
       return { type, prize: type === 'prize' ? randomPrize(random) : 0 };
     }));
+  }
+
+  function shuffled(values, random = Math.random) {
+    const result = [...values];
+    for (let index = result.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(random() * (index + 1));
+      [result[index], result[swap]] = [result[swap], result[index]];
+    }
+    return result;
+  }
+
+  function makeMixedWinGrid(random = Math.random) {
+    const grid = makeGrid(false, random);
+    const group = MIXED_LINE_GROUPS[Math.floor(random() * MIXED_LINE_GROUPS.length)];
+    const types = shuffled(SYMBOL_POOL, random).slice(0, group.length);
+    const assignments = new Map();
+
+    group.forEach((lineIndex, targetIndex) => {
+      PAYLINES[lineIndex].forEach((row, column) => {
+        const key = `${column}-${row}`;
+        if (!assignments.has(key)) assignments.set(key, new Set());
+        assignments.get(key).add(types[targetIndex]);
+      });
+    });
+
+    assignments.forEach((assignedTypes, key) => {
+      const [column, row] = key.split('-').map(Number);
+      grid[column][row] = {
+        type: assignedTypes.size === 1 ? [...assignedTypes][0] : 'wild',
+        prize: 0,
+      };
+    });
+
+    return grid;
   }
 
   function evaluateGrid(grid, bet, lineStake) {
@@ -113,6 +151,7 @@
     PAYLINES,
     SYMBOLS,
     SYMBOL_POOL,
+    MIXED_LINE_GROUPS,
     PRIZE_RATE,
     WILD_RATE,
     FEATURE_TRIGGER_RATE,
@@ -120,6 +159,7 @@
     randomPrize,
     randomSymbol,
     makeGrid,
+    makeMixedWinGrid,
     evaluateGrid,
     simulate,
   };

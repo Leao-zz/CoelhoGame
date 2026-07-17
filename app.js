@@ -12,7 +12,7 @@
   const PANEL_W = 590;
   const PANEL_DEFAULT_DURATION = 5200;
 
-  const { PAYLINES, SYMBOLS, FEATURE_TRIGGER_RATE, evaluateGrid } = window.CoelhoMath;
+  const { PAYLINES, SYMBOLS, FEATURE_TRIGGER_RATE, evaluateGrid, makeMixedWinGrid } = window.CoelhoMath;
   const REEL_LAYOUT = [
     { x: 69, y: 580, w: 202, h: 645, rows: 3, cellH: 215 },
     { x: 289, y: 522, w: 202, h: 740, rows: 4, cellH: 185 },
@@ -265,13 +265,15 @@
       this.featureOutroStart = 0;
       this.activeFeatureSpin = false;
       this.pendingFeature = false;
-      const demoMode = new URLSearchParams(window.location.search).get('demo');
+      const query = new URLSearchParams(window.location.search);
+      const demoMode = query.get('demo');
       this.forceFeature = demoMode === 'feature';
       this.forceLines = demoMode === 'lines';
       this.forceLine1 = demoMode === 'line1';
       this.forceLines35 = demoMode === 'lines35';
       this.forcePrize = demoMode === 'prize';
       this.forceMax = demoMode === 'max';
+      this.forceMixed = demoMode === 'mixed';
       this.overlay = null;
       this.overlayScroll = 0;
       this.dragStart = null;
@@ -284,7 +286,7 @@
       this.spinStart = 0;
       this.winStart = 0;
       this.lastTime = performance.now();
-      this.openingActive = true;
+      this.openingActive = query.get('skipOpening') !== '1';
       this.openingStarted = performance.now();
       this.openingReadyAt = this.openingStarted + 4000;
       this.spinButtonAngle = 0;
@@ -303,6 +305,8 @@
       this.grid = this.makeGrid(false);
       this.result = { total: 0, lines: [], cells: [], prizes: [] };
       this.particles = [];
+      this.moneyTransfers = [];
+      this.winCredited = true;
       this.hitAreas = [];
       this.lineCycle = 0;
       this.lineShowAll = false;
@@ -350,16 +354,7 @@
       const grid = this.makeGrid(false);
 
       if (roll < SHOWCASE_MULTI_LINE_RATE) {
-        const commonTypes = ['rabbit', 'bag', 'cards', 'coins', 'rockets', 'carrot'];
-        const type = commonTypes[Math.floor(Math.random() * commonTypes.length)];
-        const lineIndexes = PAYLINES.map((_, index) => index).sort(() => Math.random() - 0.5);
-        const count = Math.random() < 0.14 ? 10 : 2 + Math.floor(Math.random() * 5);
-        lineIndexes.slice(0, count).forEach((lineIndex) => {
-          PAYLINES[lineIndex].forEach((row, column) => {
-            grid[column][row] = { type, prize: 0 };
-          });
-        });
-        return grid;
+        return makeMixedWinGrid();
       }
 
       if (roll < SHOWCASE_MULTI_LINE_RATE + SHOWCASE_PRIZE_RATE) {
@@ -394,7 +389,7 @@
         if (target) {
           this.sound.ready();
           this.buttonPress = { id: target.id || 'generic', x: p.x, y: p.y, started: performance.now(), until: performance.now() + 190 };
-          if (this.autoActive) this.stopAuto('RODADA AUTOMÁTICA PARADA');
+          if (this.autoActive && target.id !== 'turbo') this.stopAuto('RODADA AUTOMÁTICA PARADA');
           this.sound.button(target.id === 'spin' ? 'spin' : target.id === 'turbo' ? 'turbo' : 'button');
           target.action();
         }
@@ -449,6 +444,7 @@
         particle.rotation += particle.spin * dt;
         return particle.life > 0;
       });
+      this.moneyTransfers = this.moneyTransfers.filter((transfer) => time - transfer.started < transfer.duration + 260);
 
       if (this.state === 'SPIN_LOOP') {
         const elapsed = time - this.spinStart;
@@ -471,7 +467,10 @@
         if (!phase.showAll && phase.index !== this.lastLineSoundIndex) {
           this.lastLineSoundIndex = phase.index;
           this.sound.lineWin(phase.index);
+          this.launchLineTransfer(this.result.lines[phase.index], time);
         }
+        const accounting = this.getWinAccounting(time);
+        if (accounting.transferProgress >= 1) this.completeBalanceTransfer();
         if (time - this.winStart > this.getWinTiming().totalDuration) {
           this.advanceAfterResult(time);
         }
@@ -507,15 +506,65 @@
 
     getWinTiming() {
       const count = this.result.lines.length;
-      if (!count) return { allDuration: 0, lineDuration: 0, totalDuration: this.turbo ? 1450 : 4300 };
       const allDuration = this.turbo ? 340 : 1500;
-      const lineDuration = this.turbo ? 210 : clamp(6200 / count, 760, 1150);
-      const holdDuration = this.turbo ? 180 : 760;
+      const lineDuration = count ? (this.turbo ? 240 : clamp(6800 / count, 820, 1220)) : 0;
+      const lineEnd = allDuration + lineDuration * count;
+      const lineRawTotal = this.result.lines.reduce((sum, line) => sum + line.amount, 0);
+      const prizeExtra = Math.max(0, this.result.total - Math.min(this.result.total, lineRawTotal));
+      const prizeDuration = prizeExtra > 0 || !count ? (this.turbo ? 340 : 900) : 0;
+      const transferStart = lineEnd + prizeDuration + (this.turbo ? 100 : 360);
+      const transferDuration = this.turbo ? 260 : 720;
+      const holdDuration = this.turbo ? 160 : 420;
       return {
         allDuration,
         lineDuration,
-        totalDuration: allDuration + lineDuration * count + holdDuration,
+        lineEnd,
+        lineRawTotal,
+        prizeExtra,
+        prizeDuration,
+        transferStart,
+        transferDuration,
+        totalDuration: transferStart + transferDuration + holdDuration,
       };
+    }
+
+    getWinAccounting(time = this.renderTime) {
+      if (this.lastWin <= 0 || !this.result.total) {
+        return { counted: 0, gain: 0, balance: this.balance, transferProgress: 1 };
+      }
+      if (this.winCredited) {
+        return { counted: this.lastWin, gain: 0, balance: this.balance, transferProgress: 1 };
+      }
+      const timing = this.getWinTiming();
+      const elapsed = Math.max(0, time - this.winStart);
+      const lineScale = timing.lineRawTotal > this.result.total ? this.result.total / timing.lineRawTotal : 1;
+      let counted = 0;
+      this.result.lines.forEach((line, index) => {
+        const start = timing.allDuration + index * timing.lineDuration;
+        const raw = timing.lineDuration ? clamp((elapsed - start) / timing.lineDuration, 0, 1) : 1;
+        const eased = raw * raw * (3 - 2 * raw);
+        counted += line.amount * lineScale * eased;
+      });
+      if (timing.prizeExtra > 0) {
+        const raw = clamp((elapsed - timing.lineEnd) / Math.max(1, timing.prizeDuration), 0, 1);
+        counted += timing.prizeExtra * raw * raw * (3 - 2 * raw);
+      }
+      counted = Math.min(this.result.total, counted);
+      const transferProgress = clamp((elapsed - timing.transferStart) / timing.transferDuration, 0, 1);
+      const easedTransfer = transferProgress * transferProgress * (3 - 2 * transferProgress);
+      return {
+        counted,
+        gain: counted * (1 - easedTransfer),
+        balance: this.balance + this.result.total * easedTransfer,
+        transferProgress,
+      };
+    }
+
+    completeBalanceTransfer() {
+      if (this.winCredited || this.lastWin <= 0) return;
+      this.balance += this.lastWin;
+      this.winCredited = true;
+      this.checkAutoLimits();
     }
 
     activatePanelItem(item, time) {
@@ -580,6 +629,7 @@
     }
 
     advanceAfterResult(time) {
+      this.completeBalanceTransfer();
       if (this.pendingFeature) {
         this.pendingFeature = false;
         this.featureIntroStart = time;
@@ -612,6 +662,7 @@
 
     spin() {
       if (!['IDLE', 'WIN', 'NO_WIN'].includes(this.state)) return;
+      this.completeBalanceTransfer();
       const featureSpin = this.featureRemaining > 0;
       if (!featureSpin && this.balance < this.bet) {
         this.message = 'SALDO FICTÍCIO INSUFICIENTE';
@@ -651,7 +702,8 @@
       if (this.forceMax && !featureSpin) {
         this.grid = [3, 4, 3].map((rows) => Array.from({ length: rows }, () => ({ type: 'prize', prize: 500 })));
       }
-      const deterministicDemo = this.forceLines || this.forceLine1 || this.forceLines35 || this.forcePrize || this.forceMax;
+      if (this.forceMixed && !featureSpin) this.grid = makeMixedWinGrid();
+      const deterministicDemo = this.forceLines || this.forceLine1 || this.forceLines35 || this.forcePrize || this.forceMax || this.forceMixed;
       this.pendingFeature = !featureSpin && !deterministicDemo && (this.forceFeature || Math.random() < FEATURE_TRIGGER_RATE);
       this.forceFeature = false;
       this.forceLines = false;
@@ -659,6 +711,7 @@
       this.forceLines35 = false;
       this.forcePrize = false;
       this.forceMax = false;
+      this.forceMixed = false;
       this.reels.forEach((reel) => {
         reel.strip = this.randomStrip(22, featureSpin);
         reel.offset = 0;
@@ -697,7 +750,7 @@
       this.sound.stopSpin();
       this.result = this.evaluate();
       this.lastWin = this.result.total;
-      this.balance += this.result.total;
+      this.winCredited = this.result.total <= 0;
       if (this.activeFeatureSpin) this.featureTotal += this.result.total;
       this.winStart = time;
       this.lastLineSoundIndex = -1;
@@ -716,7 +769,7 @@
         id: `${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
       });
       this.history = this.history.slice(0, 60);
-      this.checkAutoLimits();
+      if (this.result.total <= 0) this.checkAutoLimits();
 
       if (this.result.total > 0) {
         this.state = 'WIN';
@@ -724,7 +777,7 @@
         this.activatePanelItem({
           text: `WIN ${this.result.total.toFixed(2).replace('.', ',')}`,
           mode: 'center',
-          duration: 4200,
+          duration: (this.getWinTiming().totalDuration + 1000) / 1.6,
         }, time);
         if (this.pendingFeature) this.enqueuePanel('8 RODADAS DA FORTUNA!', 'center', 3400);
         this.sound.win(this.result.total >= this.bet * 10);
@@ -785,6 +838,56 @@
       }
     }
 
+    launchLineTransfer(line, time) {
+      if (!line) return;
+      const centerCell = line.cells.find((cell) => cell.c === 1) || line.cells[1];
+      const reel = REEL_LAYOUT[centerCell.c];
+      this.moneyTransfers.push({
+        x: reel.x + reel.w / 2,
+        y: reel.y + centerCell.r * reel.cellH + reel.cellH / 2,
+        amount: line.amount,
+        started: time,
+        duration: this.turbo ? 460 : 900,
+        seed: Math.random() * TAU,
+      });
+      this.burst(reel.x + reel.w / 2, reel.y + centerCell.r * reel.cellH + reel.cellH / 2, 12, '#ffe86b');
+    }
+
+    drawMoneyTransfers(time) {
+      const ctx = this.ctx;
+      const targetX = 390;
+      const targetY = 1319;
+      this.moneyTransfers.forEach((transfer) => {
+        const count = this.turbo ? 6 : 10;
+        for (let index = 0; index < count; index += 1) {
+          const delay = index * (this.turbo ? 22 : 38);
+          const progress = clamp((time - transfer.started - delay) / Math.max(1, transfer.duration - delay), 0, 1);
+          if (progress <= 0 || progress >= 1) continue;
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const side = Math.sin(transfer.seed + index * 1.8) * 42 * Math.sin(progress * Math.PI);
+          const x = lerp(transfer.x, targetX, eased) + side;
+          const y = lerp(transfer.y, targetY, eased) - Math.sin(progress * Math.PI) * (65 + index * 3);
+          const alpha = clamp(progress / 0.12, 0, 1) * clamp((1 - progress) / 0.14, 0, 1);
+          const size = 8 + (index % 3) * 2;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.translate(x, y);
+          ctx.rotate(progress * TAU * 2.4 + transfer.seed + index);
+          ctx.scale(1, 0.45 + Math.abs(Math.cos(progress * TAU * 3)) * 0.55);
+          ctx.fillStyle = '#ffd94f';
+          ctx.strokeStyle = '#9e4f0b';
+          ctx.lineWidth = 2;
+          ctx.shadowColor = '#fff078';
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, size, size * 0.78, 0, 0, TAU);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
+    }
+
     coinRain(count = 70) {
       for (let index = 0; index < count; index += 1) {
         this.particles.push({
@@ -819,6 +922,7 @@
       this.drawStatus();
       this.drawControls(time);
       this.drawParticles();
+      this.drawMoneyTransfers(time);
       this.drawFeatureOverlay(time);
       if (this.overlay) {
         this.hitAreas = [];
@@ -1906,6 +2010,15 @@
       });
     }
 
+    getWinPanelPalette() {
+      const ratio = this.bet ? this.lastWin / this.bet : 0;
+      if (ratio >= 100) return ['#4f0639', '#db1f62', '#ff8f2d'];
+      if (ratio >= 20) return ['#5b1532', '#d34824', '#ffbf35'];
+      if (ratio >= 5) return ['#24134f', '#7b2d84', '#eebf35'];
+      if (ratio >= 1) return ['#102a62', '#176a9d', '#45d7d0'];
+      return ['#25134d', '#592875', '#b14888'];
+    }
+
     drawTicker() {
       const ctx = this.ctx;
       const x = PANEL_X;
@@ -1914,6 +2027,8 @@
       const h = 78;
       const isWin = /^WIN\s/.test(this.tickerText);
       const winElapsed = this.renderTime - this.tickerStarted;
+      const accounting = isWin ? this.getWinAccounting(this.renderTime) : null;
+      const displayText = isWin ? `WIN ${accounting.counted.toFixed(2).replace('.', ',')}` : this.tickerText;
       ctx.save();
       if (ASSETS.displayFrame) ctx.drawImage(ASSETS.displayFrame, x, y, w, h);
       else this.roundRect(x, y, w, h, 18, '#30205d', '#f7b952', 4);
@@ -1922,11 +2037,20 @@
       ctx.rect(x + 25, y + 11, w - 50, h - 22);
       ctx.clip();
       if (isWin) {
+        const palette = this.getWinPanelPalette();
+        const panelFill = ctx.createLinearGradient(x + 24, y, x + w - 24, y + h);
+        panelFill.addColorStop(0, palette[0]);
+        panelFill.addColorStop(0.52, palette[1]);
+        panelFill.addColorStop(1, palette[2]);
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = panelFill;
+        ctx.fillRect(x + 20, y + 8, w - 40, h - 16);
+        ctx.globalAlpha = 1;
         const burst = clamp(winElapsed / 260, 0, 1) * clamp((this.tickerDuration - winElapsed) / 500, 0, 1);
         const panelGlow = ctx.createRadialGradient(x + w / 2, y + h / 2, 2, x + w / 2, y + h / 2, w * 0.48);
         panelGlow.addColorStop(0, `rgba(255,230,93,${0.52 * burst})`);
-        panelGlow.addColorStop(0.32, `rgba(255,94,66,${0.36 * burst})`);
-        panelGlow.addColorStop(0.72, `rgba(139,28,120,${0.44 * burst})`);
+        panelGlow.addColorStop(0.32, `${palette[2]}88`);
+        panelGlow.addColorStop(0.72, `${palette[1]}77`);
         panelGlow.addColorStop(1, 'rgba(40,8,74,0)');
         ctx.fillStyle = panelGlow;
         ctx.fillRect(x + 20, y + 8, w - 40, h - 16);
@@ -1966,8 +2090,8 @@
       ctx.fillStyle = isWin ? winTextGradient : '#fff0a2';
       ctx.shadowColor = isWin ? '#ffde57' : 'transparent';
       ctx.shadowBlur = isWin ? 15 : 0;
-      ctx.strokeText(this.tickerText, 0, 0);
-      ctx.fillText(this.tickerText, 0, 0);
+      ctx.strokeText(displayText, 0, 0);
+      ctx.fillText(displayText, 0, 0);
       ctx.restore();
     }
 
@@ -1977,12 +2101,10 @@
       ctx.textAlign = 'center';
       if (ASSETS.scoreFrame) ctx.drawImage(ASSETS.scoreFrame, 16, 1370, 748, 86);
       else this.roundRect(16, 1370, 748, 86, 24, '#2d205e', '#f3b862', 5);
-      const countedWin = this.state === 'WIN'
-        ? this.lastWin * clamp((performance.now() - this.winStart) / (this.turbo ? 500 : 1500), 0, 1)
-        : this.lastWin;
+      const accounting = this.getWinAccounting(this.renderTime);
       const stats = [
-        { x: 157, label: 'SALDO', value: money(this.balance) },
-        { x: 390, label: 'GANHO TOTAL', value: money(countedWin), gold: true },
+        { x: 157, label: 'SALDO', value: money(accounting.balance) },
+        { x: 390, label: 'GANHO TOTAL', value: money(accounting.gain), gold: true },
         { x: 623, label: 'APOSTA', value: money(this.bet) },
       ];
       stats.forEach((stat) => {
@@ -2053,24 +2175,14 @@
       const fortuneCount = this.featureRemaining + (this.activeFeatureSpin && spinBusy ? 1 : 0);
       const idlePulse = spinBusy ? 1 : 1 + Math.sin(time * 0.0038) * 0.011;
       const pressedScale = this.pressScale('spin', time);
-      ctx.save();
-      ctx.translate(390, 1588);
-      ctx.scale(idlePulse * pressedScale, idlePulse * pressedScale);
-      ctx.rotate(this.spinButtonAngle);
-      this.drawImageContain(ASSETS.spinButton, 0, 0, 194, 194);
-      ctx.restore();
       if (this.autoActive) {
-        const remaining = Math.max(1, this.autoRemaining);
+        this.drawAutoIndicator(time, Math.max(0, this.autoRemaining), pressedScale, spinBusy);
+      } else {
         ctx.save();
-        ctx.translate(455, 1518);
-        const badgePulse = 1 + Math.sin(time * 0.01) * 0.035;
-        ctx.scale(badgePulse, badgePulse);
-        this.roundRect(-61, -28, 122, 56, 23, '#4b155fe8', '#fff090', 5);
-        ctx.fillStyle = '#fff4b2';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = '900 21px Arial Black, Arial';
-        ctx.fillText(`AUTO ${remaining}`, 0, 1);
+        ctx.translate(390, 1588);
+        ctx.scale(idlePulse * pressedScale, idlePulse * pressedScale);
+        ctx.rotate(this.spinButtonAngle);
+        this.drawImageContain(ASSETS.spinButton, 0, 0, 194, 194);
         ctx.restore();
       }
       if (fortuneActive) {
@@ -2085,7 +2197,59 @@
         ctx.restore();
       }
       this.drawPressFeedback(time);
-      this.hit(293, 1491, 194, 194, () => spinBusy ? this.fastStop() : this.spin(), 'spin');
+      this.hit(293, 1491, 194, 194, () => {
+        if (autoWasActive) return;
+        if (spinBusy) this.fastStop(); else this.spin();
+      }, 'spin');
+    }
+
+    drawAutoIndicator(time, remaining, pressedScale, spinning) {
+      const ctx = this.ctx;
+      const pulse = 1 + Math.sin(time * 0.007) * 0.014;
+      ctx.save();
+      ctx.translate(390, 1588);
+      ctx.scale(pulse * pressedScale, pulse * pressedScale);
+      const base = ctx.createRadialGradient(-18, -26, 8, 0, 0, 90);
+      base.addColorStop(0, '#6f5bdb');
+      base.addColorStop(0.5, '#34258a');
+      base.addColorStop(1, '#170d50');
+      ctx.fillStyle = base;
+      ctx.strokeStyle = '#ffc84e';
+      ctx.lineWidth = 10;
+      ctx.shadowColor = '#54e8ff';
+      ctx.shadowBlur = 18;
+      ctx.beginPath();
+      ctx.arc(0, 0, 84, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.save();
+      ctx.rotate(this.spinButtonAngle + time * (spinning ? 0.0018 : 0.00045));
+      ctx.setLineDash([18, 10]);
+      ctx.lineDashOffset = -time * 0.02;
+      ctx.strokeStyle = '#7ff2ff';
+      ctx.lineWidth = 5;
+      ctx.shadowColor = '#73efff';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(0, 0, 68, 0, TAU);
+      ctx.stroke();
+      ctx.restore();
+      ctx.shadowBlur = 0;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#9ef6ff';
+      ctx.font = '900 20px Arial Black, Arial';
+      ctx.fillText('AUTO', 0, -35);
+      ctx.fillStyle = '#fff2a3';
+      ctx.font = '900 54px Arial Black, Arial';
+      ctx.strokeStyle = '#20084f';
+      ctx.lineWidth = 7;
+      ctx.strokeText(String(remaining), 0, 5);
+      ctx.fillText(String(remaining), 0, 5);
+      ctx.fillStyle = '#d9fbff';
+      ctx.font = '800 13px Arial, sans-serif';
+      ctx.fillText(remaining === 1 ? 'RODADA' : 'RODADAS', 0, 45);
+      ctx.restore();
     }
 
     openOverlay(name) {
