@@ -538,18 +538,27 @@
       const timing = this.getWinTiming();
       const elapsed = Math.max(0, time - this.winStart);
       const lineScale = timing.lineRawTotal > this.result.total ? this.result.total / timing.lineRawTotal : 1;
-      let counted = 0;
+      const prizeAmounts = (this.result.prizes || []).length >= 5
+        ? this.result.prizes.map((prize) => prize.value * this.bet)
+        : [];
+      const minimumWin = Math.min(
+        this.result.total,
+        ...this.result.lines.map((line) => line.amount * lineScale),
+        ...prizeAmounts,
+      );
+      let countedFromZero = 0;
       this.result.lines.forEach((line, index) => {
         const start = timing.allDuration + index * timing.lineDuration;
-        const raw = timing.lineDuration ? clamp((elapsed - start) / timing.lineDuration, 0, 1) : 1;
+        const raw = timing.lineDuration ? clamp(((elapsed - start) / timing.lineDuration) * 3, 0, 1) : 1;
         const eased = raw * raw * (3 - 2 * raw);
-        counted += line.amount * lineScale * eased;
+        countedFromZero += line.amount * lineScale * eased;
       });
       if (timing.prizeExtra > 0) {
-        const raw = clamp((elapsed - timing.lineEnd) / Math.max(1, timing.prizeDuration), 0, 1);
-        counted += timing.prizeExtra * raw * raw * (3 - 2 * raw);
+        const raw = clamp(((elapsed - timing.lineEnd) / Math.max(1, timing.prizeDuration)) * 3, 0, 1);
+        countedFromZero += timing.prizeExtra * raw * raw * (3 - 2 * raw);
       }
-      counted = Math.min(this.result.total, counted);
+      const zeroProgress = clamp(countedFromZero / this.result.total, 0, 1);
+      const counted = minimumWin + (this.result.total - minimumWin) * zeroProgress;
       const transferProgress = clamp((elapsed - timing.transferStart) / timing.transferDuration, 0, 1);
       const easedTransfer = transferProgress * transferProgress * (3 - 2 * transferProgress);
       return {

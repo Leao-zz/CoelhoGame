@@ -268,6 +268,7 @@ Legenda:
 - [x] Estilizar o painel de ganho no formato `WIN 0,30`, com texto dourado, contorno escuro e explosão.
 - [x] Misturar símbolos diferentes entre várias linhas vencedoras do mesmo giro.
 - [x] Somar o valor de `WIN` progressivamente durante a exibição de cada linha.
+- [x] Iniciar `WIN` no menor prêmio real da rodada e acelerar a contagem em 3×.
 - [x] Animar moedas saindo da linha marcada em direção ao painel de ganho.
 - [x] Transferir `GANHO TOTAL` para `SALDO` com contagem animada.
 - [x] Alterar a cor do painel `WIN` conforme a categoria do prêmio.

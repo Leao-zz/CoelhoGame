@@ -42,6 +42,8 @@ assert.match(app, /demoMode === 'mixed'/);
 assert.match(app, /SHOWCASE_MULTI_LINE_RATE/);
 assert.match(app, /makeMixedWinGrid/);
 assert.match(app, /getWinAccounting/);
+assert.match(app, /const minimumWin = Math\.min/);
+assert.match(app, /\* 3, 0, 1/);
 assert.match(app, /completeBalanceTransfer/);
 assert.match(app, /launchLineTransfer/);
 assert.match(app, /drawMoneyTransfers/);
