@@ -35,6 +35,7 @@ Legenda:
 ### Estados progressivos de vitória e painel financeiro — 18/07/2026
 
 - [x] Classificar ganhos por razão sobre a aposta: pequena `<2×`, média `2–10×`, grande `10–50×`, mega `50–100×` e máxima `≥100×`.
+- [x] Substituir os títulos textuais de Grande e Mega Ganho por artes próprias, com entrada luminosa e efeitos distintos.
 - [x] Manter as faixas e intensidades configuráveis em um único mapa no código.
 - [x] Preservar o resultado completo por `90–250 ms` antes de iniciar qualquer destaque.
 - [x] Apresentar combinações vencedoras uma por vez e reunir todas somente no fechamento.

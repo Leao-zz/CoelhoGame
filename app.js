@@ -84,6 +84,8 @@
     celebration3: 'assets/celebration/clean/animacao_ganhou3.png',
     celebration4: 'assets/celebration/clean/animacao_ganhou4.png',
     celebration5: 'assets/celebration/clean/animacao_ganhou5.png',
+    bigWinTitle: 'assets/celebration/clean/texto_grande_ganho.png',
+    megaWinTitle: 'assets/celebration/clean/texto_mega_ganho.png',
     idle1: 'assets/idle/clean/animacao_parado1.png',
     idle2: 'assets/idle/clean/animacao_parado2.png',
     idle3: 'assets/idle/clean/animacao_parado3.png',
@@ -2125,16 +2127,18 @@
       // A vitória máxima já possui uma celebração de tela inteira. Evita repetir
       // o mesmo título no banner intermediário enquanto o overlay está visível.
       if (this.winTier === 'max') return;
-      const category = {
-        small: { label: 'GANHO', color: '#fff5c4', width: 300, font: 30 },
-        medium: { label: 'ÓTIMO GANHO', color: '#fff0a3', width: 390, font: 34 },
-        big: { label: 'GRANDE GANHO', color: '#ffd45f', width: 500, font: 42 },
-        mega: { label: 'MEGA GANHO', color: '#ff85d5', width: 540, font: 44 },
-        max: { label: 'VITÓRIA MÁXIMA', color: '#fff37a', width: 620, font: 46 },
-      }[this.winTier || 'small'];
       if (!this.lineShowAll || elapsed < timing.stepEnd) return;
       const finalElapsed = elapsed - timing.stepEnd;
       const appear = clamp(finalElapsed / 380, 0, 1) * clamp((timing.totalDuration - elapsed) / 320, 0, 1);
+      if (this.winTier === 'big' || this.winTier === 'mega') {
+        this.drawWinCategoryArtwork(time, finalElapsed, appear);
+        return;
+      }
+      const category = {
+        small: { label: 'GANHO', color: '#fff5c4', width: 300, font: 30 },
+        medium: { label: 'ÓTIMO GANHO', color: '#fff0a3', width: 390, font: 34 },
+        max: { label: 'VITÓRIA MÁXIMA', color: '#fff37a', width: 620, font: 46 },
+      }[this.winTier || 'small'];
       const pulse = 1 + Math.sin(time * 0.009) * (this.winTier === 'max' ? 0.065 : 0.035);
       const ctx = this.ctx;
       ctx.save();
@@ -2171,6 +2175,74 @@
       ctx.strokeText(category.label, 0, 0);
       ctx.fillStyle = category.color;
       ctx.fillText(category.label, 0, 0);
+      ctx.restore();
+    }
+
+    drawWinCategoryArtwork(time, finalElapsed, appear) {
+      const isMega = this.winTier === 'mega';
+      const artwork = isMega ? ASSETS.megaWinTitle : ASSETS.bigWinTitle;
+      if (!artwork) return;
+      const ctx = this.ctx;
+      const cx = 390;
+      const cy = isMega ? 995 : 1035;
+      const entryDuration = isMega ? 520 : 440;
+      const entry = easeOutBack(clamp(finalElapsed / entryDuration, 0, 1));
+      const scale = (isMega ? 0.62 : 0.7) + entry * (isMega ? 0.38 : 0.3);
+      const pulse = 1 + Math.sin(time * (isMega ? 0.0075 : 0.0065)) * (isMega ? 0.022 : 0.014);
+      const burst = 1 - clamp(finalElapsed / (isMega ? 1250 : 950), 0, 1);
+      const particleCount = isMega ? 18 : 12;
+
+      ctx.save();
+      ctx.globalAlpha = appear;
+      ctx.translate(cx, cy);
+
+      // Clarão circular e raios curtos, restritos à área dos rolos.
+      const glowRadius = isMega ? 300 : 250;
+      const glow = ctx.createRadialGradient(0, 0, 18, 0, 0, glowRadius);
+      glow.addColorStop(0, isMega ? `rgba(255,119,218,${0.38 + burst * 0.24})` : `rgba(255,224,100,${0.34 + burst * 0.2})`);
+      glow.addColorStop(0.48, isMega ? 'rgba(255,82,181,0.14)' : 'rgba(255,96,45,0.13)');
+      glow.addColorStop(1, 'rgba(255,170,30,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(-glowRadius, -glowRadius, glowRadius * 2, glowRadius * 2);
+
+      ctx.save();
+      ctx.rotate(time * (isMega ? 0.00009 : -0.000065));
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = isMega ? 'rgba(255,194,246,0.22)' : 'rgba(255,229,138,0.2)';
+      const rayCount = isMega ? 16 : 12;
+      for (let ray = 0; ray < rayCount; ray += 1) {
+        ctx.rotate(TAU / rayCount);
+        ctx.beginPath();
+        ctx.moveTo(58, -3);
+        ctx.lineTo((isMega ? 278 : 230) + burst * 55, -10 - burst * 4);
+        ctx.lineTo((isMega ? 278 : 230) + burst * 55, 10 + burst * 4);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Pequena explosão de partículas; no Mega há mais pontos e alternância rosa/dourada.
+      for (let index = 0; index < particleCount; index += 1) {
+        const angle = (index / particleCount) * TAU + (isMega ? 0.2 : 0.05);
+        const travel = clamp(finalElapsed / (isMega ? 1050 : 820), 0, 1);
+        const radius = (isMega ? 115 : 95) + travel * (isMega ? 190 : 145) + Math.sin(time * 0.004 + index) * 9;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius * 0.68;
+        const size = (isMega ? 5.5 : 4.2) + Math.sin(time * 0.011 + index * 1.7) * 1.6;
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(2, size), 0, TAU);
+        ctx.fillStyle = isMega && index % 3 === 0 ? '#ff91df' : index % 2 === 0 ? '#fff2a4' : '#ffb43e';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = isMega ? 16 : 11;
+        ctx.fill();
+      }
+
+      ctx.save();
+      ctx.scale(scale * pulse, scale * pulse);
+      ctx.shadowColor = isMega ? '#ff66d2' : '#ffc94c';
+      ctx.shadowBlur = isMega ? 34 + burst * 24 : 24 + burst * 18;
+      this.drawImageContain(artwork, 0, 0, isMega ? 520 : 485, isMega ? 420 : 335);
+      ctx.restore();
       ctx.restore();
     }
 

@@ -87,6 +87,9 @@ assert.match(app, /loadAssets\(onProgress/);
 assert.match(app, /loadingProgress\.style\.width/);
 assert.match(app, /stopAuto/);
 assert.match(app, /drawCelebrationMascot/);
+assert.match(app, /drawWinCategoryArtwork/);
+assert.match(app, /ASSETS\.bigWinTitle/);
+assert.match(app, /ASSETS\.megaWinTitle/);
 assert.match(app, /getIdleMascotFrame/);
 assert.match(app, /assets\/idle\/clean/);
 assert.match(app, /music\.volume = 0\.15/);
@@ -143,6 +146,9 @@ for (const autoAsset of [
 for (let frame = 1; frame <= 5; frame += 1) {
   assert.ok(fs.existsSync(path.join(root, `assets/celebration/clean/animacao_ganhou${frame}.png`)));
   assert.ok(fs.existsSync(path.join(root, `assets/idle/clean/animacao_parado${frame}.png`)));
+}
+for (const title of ['texto_grande_ganho.png', 'texto_mega_ganho.png']) {
+  assert.ok(fs.existsSync(path.join(root, 'assets/celebration/clean', title)));
 }
 for (const symbol of [
   '10_simbolo_saco_fortuna.png',
