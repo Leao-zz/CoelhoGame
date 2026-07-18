@@ -552,7 +552,7 @@
         }
         const accounting = this.getWinAccounting(time);
         if (accounting.transferProgress >= 1) this.completeBalanceTransfer();
-        if (this.winTier !== 'max' && time - this.winStart > this.getWinTiming().totalDuration) {
+        if (time - this.winStart > this.getWinTiming().totalDuration) {
           this.advanceAfterResult(time);
         }
       }
@@ -2170,25 +2170,20 @@
     drawMaxWinOverlay(time) {
       if (this.state !== 'WIN' || this.winTier !== 'max') return;
       const elapsed = time - this.winStart;
+      // Celebração curta: a apuração das linhas continua ao fundo, mas o foco
+      // visual de Vitória Máxima sai sozinho após dois segundos.
+      if (elapsed > 2000) return;
       const local = Math.max(0, elapsed);
-      const appear = clamp(local / 360, 0, 1);
-      const accounting = this.getWinAccounting(time);
+      const appear = clamp(local / 220, 0, 1) * clamp((2000 - local) / 260, 0, 1);
       const ctx = this.ctx;
       ctx.save();
-      ctx.globalAlpha = appear;
-      const veil = ctx.createRadialGradient(390, 720, 80, 390, 720, 850);
-      veil.addColorStop(0, 'rgba(117,24,101,0.56)');
-      veil.addColorStop(0.42, 'rgba(35,11,79,0.72)');
-      veil.addColorStop(1, 'rgba(8,4,28,0.88)');
-      ctx.fillStyle = veil;
-      ctx.fillRect(0, 0, W, H);
 
       ctx.save();
       ctx.translate(390, 640);
       ctx.rotate(local * 0.00018);
       ctx.globalCompositeOperation = 'screen';
       ctx.fillStyle = '#ffe77a';
-      ctx.globalAlpha = appear * 0.24;
+      ctx.globalAlpha = appear * 0.38;
       for (let ray = 0; ray < 24; ray += 1) {
         ctx.rotate(TAU / 24);
         ctx.beginPath();
@@ -2200,34 +2195,33 @@
       }
       ctx.restore();
 
+      // Escurece somente a área do sol giratório; tela e linhas seguem legíveis.
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(390, 640, 318, 0, TAU);
+      ctx.fillStyle = `rgba(5, 4, 20, ${0.62 * appear})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 222, 104, ${0.55 * appear})`;
+      ctx.lineWidth = 7;
+      ctx.stroke();
+      ctx.restore();
+
       const frame = [ASSETS.celebration3, ASSETS.celebration4, ASSETS.celebration5]
       [Math.floor(local / 230) % 3] || this.getIdleMascotFrame(time);
       ctx.shadowColor = '#ffd94e';
       ctx.shadowBlur = 38;
       this.drawImageContain(frame, 390, 640 - Math.sin(local * 0.006) * 12, 360, 390);
-
+      ctx.globalAlpha = appear;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = '900 58px Georgia, serif';
-      ctx.lineWidth = 12;
+      ctx.font = '900 50px Georgia, serif';
+      ctx.lineWidth = 10;
       ctx.strokeStyle = '#63163f';
       ctx.fillStyle = '#fff18a';
       ctx.shadowColor = '#ffd132';
-      ctx.shadowBlur = 30;
+      ctx.shadowBlur = 24;
       ctx.strokeText('VITÓRIA MÁXIMA', 390, 870);
       ctx.fillText('VITÓRIA MÁXIMA', 390, 870);
-      ctx.font = '900 68px Arial Black, Arial';
-      ctx.strokeText(money(accounting.counted), 390, 955);
-      ctx.fillText(money(accounting.counted), 390, 955);
-      if (accounting.transferProgress >= 1) {
-        const pulse = 0.72 + Math.sin(time * 0.007) * 0.28;
-        ctx.globalAlpha = appear * pulse;
-        ctx.font = '900 22px Arial Black, Arial';
-        ctx.fillStyle = '#fff7cf';
-        ctx.shadowBlur = 12;
-        ctx.fillText('TOQUE PARA CONTINUAR', 390, 1050);
-        this.hit(0, 0, W, H, () => this.advanceAfterResult(performance.now()), 'continue-max-win');
-      }
       ctx.restore();
     }
 
@@ -2279,11 +2273,9 @@
     getWinBannerText(accounting) {
       const phase = this.getWinLinePhase(this.renderTime);
       const amount = money(accounting.counted);
-      if (phase.settling) return `GANHO ${amount}`;
+      if (phase.settling) return `GANHOU: ${amount}`;
       if (!phase.showAll) {
-        const step = this.getWinSteps()[phase.index];
-        const prefix = step?.kind === 'line' ? `LINHA ${step.index + 1}` : `PRÊMIO ${step?.index || 1}`;
-        return `${prefix} • ${amount}`;
+        return `GANHOU: ${amount}`;
       }
       if (this.winTier === 'max') return `GANHO TOTAL • ${money(this.result.total)}`;
       if (this.winTier === 'big') return money(this.result.total);

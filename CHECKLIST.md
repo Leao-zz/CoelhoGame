@@ -193,6 +193,11 @@ Legenda:
 - [x] Validar enquadramento em viewport equivalente ao iPhone 15 Pro Max (`430 × 932`).
 - [x] Executar giro completo no navegador com prêmio e console sem erros.
 
+### Feedback de vitória — 18/07/2026
+
+- [x] Exibir ganhos de cada linha no display como `GANHOU: R$...`, sem repetir o número da linha.
+- [x] Exibir Vitória Máxima em foco circular escuro no sol giratório, por 2 segundos e sem interação obrigatória.
+
 ### Cilindros e giro
 
 - [x] Implementar três cilindros.
