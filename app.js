@@ -16,7 +16,7 @@
   const AUTO_STOP_MIN = 1600;
   const AUTO_STOP_MAX = 3200;
   const AUTO_STOP_STEP = 100;
-  const ASSET_VERSION = '23';
+  const ASSET_VERSION = '24';
   const WIN_TIER_CONFIG = Object.freeze({
     small: {
       minRatio: 0, maxRatio: 2, label: 'GANHO', settle: 220, lineDuration: 650,
@@ -590,9 +590,15 @@
 
       if (this.state === 'WIN') {
         const phase = this.getWinLinePhase(time);
+        const timing = this.getWinTiming();
+        const winElapsed = time - this.winStart;
+        const categoryIntroActive = (this.winTier === 'big' || this.winTier === 'mega')
+          && winElapsed >= timing.baseSettleDuration;
         this.lineCycle = phase.index;
         this.lineShowAll = phase.showAll;
-        if (this.lastWin > 0 && !phase.settling && !this.winEffectsStarted) this.startWinEffects(time);
+        if (this.lastWin > 0 && (categoryIntroActive || !phase.settling) && !this.winEffectsStarted) {
+          this.startWinEffects(time);
+        }
         if (!phase.settling && !phase.showAll && phase.index !== this.lastLineSoundIndex) {
           this.lastLineSoundIndex = phase.index;
           this.sound.lineWin(phase.index);

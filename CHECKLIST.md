@@ -14,6 +14,7 @@ Legenda:
 ## Concluído
 
 - [x] Adicionar efeitos OGG específicos para ganho normal, grande ganho, super ganho e mega ganho, respeitando controle de efeitos.
+- [x] Disparar efeito de vitória no início da placa Grande/Mega, antes da sequência das linhas, preservando introduções de 1,8 s e 2,2 s.
 
 - [x] Rodada automática inicia imediatamente ao escolher 10, 30, 50, 80 ou 100 rodadas; botão INICIAR e X antigo removidos; novo botão FECHAR adicionado na base.
 
