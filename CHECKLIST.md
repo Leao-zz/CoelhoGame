@@ -13,6 +13,9 @@ Legenda:
 
 ## Concluído
 
+- [x] Dar vida ao céu com estrelas pulsantes alinhadas à arte, poeira dourada suave e cometa ocasional atrás do cenário.
+- [x] Animar entrada e saída da Rodada Automática com escurecimento progressivo, escala, deslocamento e bloqueio de toque durante a transição.
+
 - [x] Adicionar efeitos OGG específicos para ganho normal, grande ganho, super ganho e mega ganho, respeitando controle de efeitos.
 - [x] Disparar efeito de vitória no início da placa Grande/Mega, antes da sequência das linhas, preservando introduções de 1,8 s e 2,2 s.
 
@@ -42,7 +45,9 @@ Legenda:
 - [x] Classificar ganhos por razão sobre a aposta: pequena `<2×`, média `2–10×`, grande `10–50×`, mega `50–100×` e máxima `≥100×`.
 - [x] Substituir os títulos textuais de Grande e Mega Ganho por artes próprias, com entrada luminosa e efeitos distintos.
 - [x] Centralizar as artes de Grande e Mega Ganho com sombra orgânica baseada no alpha da própria arte, sem retângulo preto sobre os rolos.
-- [x] Diferenciar Grande Ganho com explosão dourada e uma onda de choque; Mega Ganho com dois pulsos, energia rosa/dourada e pétalas luminosas.
+- [x] Separar Grande e Mega em sequências independentes: Grande com queda de medalhão, impacto dourado e fontes laterais de moedas; Mega com portal espiral, três ondas, moedas orbitais, cometas e pétalas.
+- [x] Elevar Vitória Máxima acima do Mega com coroação solar dourada, 32 raios, anéis contrapostos, três ondas e coroa orbital de moedas, sem repetir portal ou pétalas.
+- [x] Alternar três composições internas por categoria, impedindo repetição visual imediata sem afetar matemática ou pagamento.
 - [x] Exibir Grande e Mega Ganho antes da sequência individual das linhas vencedoras.
 - [x] Versionar URLs dos assets para atualizar imagens modificadas também no servidor Python.
 - [x] Manter as faixas e intensidades configuráveis em um único mapa no código.

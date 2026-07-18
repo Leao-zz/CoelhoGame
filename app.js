@@ -8,6 +8,8 @@
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeOutBack = (t) => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+  const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+  const easeInCubic = (t) => t * t * t;
   const PANEL_X = 90;
   const PANEL_W = 600;
   const DISPLAY_Y = 1208;
@@ -16,7 +18,7 @@
   const AUTO_STOP_MIN = 1600;
   const AUTO_STOP_MAX = 3200;
   const AUTO_STOP_STEP = 100;
-  const ASSET_VERSION = '25';
+  const ASSET_VERSION = '27';
   const WIN_TIER_CONFIG = Object.freeze({
     small: {
       minRatio: 0, maxRatio: 2, label: 'GANHO', settle: 220, lineDuration: 650,
@@ -51,6 +53,15 @@
     right: [2, 4, 1, 6, 8, 3, 5, 10, 7, 9],
   };
   const LINE_RAIL_Y = [507, 565, 623, 713, 770, 828, 886, 992, 1050, 1108];
+  // Pontos coincidentes com as estrelas já pintadas no céu. O brilho é
+  // sobreposto no mesmo lugar para preservar a composição da arte original.
+  const SKY_STAR_POINTS = Object.freeze([
+    [182, 50, 1.05], [315, 54, 0.8], [562, 48, 0.9], [79, 182, 0.8],
+    [726, 201, 1.05], [168, 231, 0.72], [196, 306, 0.8], [293, 496, 1],
+    [594, 553, 0.82], [198, 632, 0.76], [63, 721, 1], [190, 756, 0.72],
+    [518, 813, 0.86], [198, 1038, 0.72], [650, 1043, 0.92], [514, 1076, 0.72],
+    [61, 1193, 0.82], [395, 1238, 0.98], [620, 1437, 0.84], [310, 1587, 1.05],
+  ]);
   const ASSET_PATHS = {
     sky: 'assets/layout-v3/fundo.png',
     roofLeft: 'assets/layout-v3/telhado_esquerda.png',
@@ -369,6 +380,9 @@
       this.forceWinTier = demoMode.startsWith('tier-') ? demoMode.slice(5) : null;
       this.overlay = null;
       this.overlayScroll = 0;
+      this.overlayPhase = 'closed';
+      this.overlayTransitionStart = 0;
+      this.overlayAfterClose = null;
       this.dragStart = null;
       this.autoSliderDrag = false;
       this.history = [];
@@ -386,6 +400,7 @@
       this.celebrateWin = false;
       this.winTier = 'small';
       this.winEffectsStarted = false;
+      this.winVisualVariant = 0;
       this.balancePulseStart = 0;
       this.reels = REEL_LAYOUT.map((layout, index) => ({
         ...layout,
@@ -488,6 +503,9 @@
         event.preventDefault();
         const p = point(event);
         if (this.overlay === 'auto') {
+          // Evita acionar controles enquanto a casa ainda está entrando ou
+          // saindo. O feedback visual termina antes de aceitar novo toque.
+          if (this.overlayPhase !== 'open') return;
           const layout = this.getAutoOverlayLayout();
           if (this.isAutoSliderPoint(p, layout)) {
             this.sound.ready();
@@ -562,6 +580,7 @@
 
     update(time, dt) {
       this.featurePulse += dt * 0.004;
+      this.updateOverlayTransition(time);
       if (this.state === 'SPIN_LOOP') this.spinButtonAngle = (this.spinButtonAngle + dt * (this.turbo ? 0.0095 : 0.0064)) % TAU;
       this.updateTicker(time, dt);
       this.particles = this.particles.filter((particle) => {
@@ -664,7 +683,7 @@
       const count = steps.length;
       const baseSettleDuration = this.turbo ? 90 : config.settle;
       const categoryIntroDuration = this.winTier === 'mega'
-        ? (this.turbo ? 900 : 2200)
+        ? (this.turbo ? 1050 : 2550)
         : this.winTier === 'big'
           ? (this.turbo ? 760 : 1800)
           : 0;
@@ -960,6 +979,9 @@
       this.lastLineSoundIndex = -1;
       this.winTier = this.getWinTier();
       this.winEffectsStarted = false;
+      // Evita repetição visual imediata. Cada nova celebração alterna entre
+      // três composições sem mudar resultado, pagamento ou duração das linhas.
+      this.winVisualVariant = (this.winVisualVariant + 1 + Math.floor(Math.random() * 2)) % 3;
       this.celebrateWin = this.winTier !== 'small';
 
       if (this.pendingFeature && this.featureRemaining === 0) {
@@ -1192,6 +1214,7 @@
         ctx.fillRect(0, 0, W, H);
       }
 
+      this.drawSkyAtmosphere(time);
       this.drawMovingClouds(time);
       this.drawHouseScene('left', time);
       this.drawHouseScene('right', time);
@@ -1230,6 +1253,116 @@
         ctx.fillStyle = fortune;
         ctx.fillRect(0, 0, W, H);
       }
+    }
+
+    drawSkyAtmosphere(time) {
+      this.drawTwinklingStars(time);
+      this.drawFallingSkyDust(time);
+      this.drawSkyComet(time);
+    }
+
+    drawTwinklingStars(time) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      SKY_STAR_POINTS.forEach(([x, y, size], index) => {
+        const wave = Math.sin(time * (0.0022 + (index % 4) * 0.00017) + index * 1.73);
+        const pulse = Math.pow(Math.max(0, wave), 2.4);
+        if (pulse < 0.035) return;
+        const radius = (2.3 + pulse * 5.8) * size;
+        const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 2.6);
+        glow.addColorStop(0, `rgba(255,255,225,${0.72 * pulse})`);
+        glow.addColorStop(0.28, `rgba(255,221,116,${0.34 * pulse})`);
+        glow.addColorStop(1, 'rgba(255,198,76,0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 2.6, 0, TAU);
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(Math.PI / 4);
+        ctx.globalAlpha = 0.22 + pulse * 0.68;
+        ctx.fillStyle = '#fff8cf';
+        ctx.shadowColor = '#ffd566';
+        ctx.shadowBlur = 8 + pulse * 12;
+        ctx.fillRect(-0.75 * size, -radius, 1.5 * size, radius * 2);
+        ctx.fillRect(-radius, -0.75 * size, radius * 2, 1.5 * size);
+        ctx.restore();
+      });
+      ctx.restore();
+    }
+
+    drawFallingSkyDust(time) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      for (let index = 0; index < 18; index += 1) {
+        const duration = 9800 + (index % 6) * 1150;
+        const progress = ((time + index * 1783) % duration) / duration;
+        const lane = (index * 137 + (index % 3) * 47) % W;
+        const drift = Math.sin(progress * TAU + index * 0.83) * (12 + (index % 4) * 4);
+        const x = (lane + drift + W) % W;
+        const y = -24 + progress * (H + 48);
+        const edgeFade = Math.sin(progress * Math.PI);
+        const shimmer = 0.48 + Math.sin(time * 0.003 + index * 1.9) * 0.28;
+        const alpha = Math.max(0.025, edgeFade * shimmer * 0.18);
+        const radius = 1.2 + (index % 4) * 0.55;
+        const dust = ctx.createRadialGradient(x, y, 0, x, y, radius * 3.8);
+        dust.addColorStop(0, `rgba(255,248,194,${alpha})`);
+        dust.addColorStop(0.35, `rgba(255,210,92,${alpha * 0.58})`);
+        dust.addColorStop(1, 'rgba(255,190,62,0)');
+        ctx.fillStyle = dust;
+        ctx.beginPath();
+        ctx.arc(x, y, radius * 3.8, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    drawSkyComet(time) {
+      const ctx = this.ctx;
+      const cycleDuration = 21000;
+      const activeDuration = 1750;
+      const cycle = Math.floor(time / cycleDuration);
+      const elapsed = time % cycleDuration;
+      if (elapsed > activeDuration) return;
+      const progress = elapsed / activeDuration;
+      const fade = Math.sin(progress * Math.PI);
+      const rightToLeft = cycle % 2 === 1;
+      const startX = rightToLeft ? W + 100 : -100;
+      const endX = rightToLeft ? 180 : 600;
+      const startY = 105 + (cycle % 3) * 52;
+      const endY = startY + 145;
+      const x = lerp(startX, endX, easeOutCubic(progress));
+      const y = lerp(startY, endY, progress) - Math.sin(progress * Math.PI) * 22;
+      const direction = rightToLeft ? 1 : -1;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = fade * 0.58;
+      const tail = ctx.createLinearGradient(x, y, x + direction * 150, y - 43);
+      tail.addColorStop(0, 'rgba(255,249,219,0.92)');
+      tail.addColorStop(0.22, 'rgba(126,226,255,0.52)');
+      tail.addColorStop(1, 'rgba(117,169,255,0)');
+      ctx.strokeStyle = tail;
+      ctx.lineWidth = 3.2;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = '#b9eeff';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + direction * 78, y - 31, x + direction * 150, y - 43);
+      ctx.stroke();
+      const head = ctx.createRadialGradient(x, y, 0, x, y, 14);
+      head.addColorStop(0, '#fffde4');
+      head.addColorStop(0.28, 'rgba(168,235,255,0.88)');
+      head.addColorStop(1, 'rgba(92,160,255,0)');
+      ctx.fillStyle = head;
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, TAU);
+      ctx.fill();
+      ctx.restore();
     }
 
     drawAmbientWisps(time) {
@@ -2245,148 +2378,311 @@
     }
 
     drawWinCategoryArtwork(time, finalElapsed, appear) {
-      const isMega = this.winTier === 'mega';
-      const artwork = isMega ? ASSETS.megaWinTitle : ASSETS.bigWinTitle;
+      if (this.winTier === 'mega') this.drawMegaWinArtwork(time, finalElapsed, appear);
+      else this.drawBigWinArtwork(time, finalElapsed, appear);
+    }
+
+    drawBigWinArtwork(time, elapsed, appear) {
+      const artwork = ASSETS.bigWinTitle;
       if (!artwork) return;
       const ctx = this.ctx;
-      const cx = 390;
-      const cy = isMega ? 790 : 825;
-      const entryDuration = isMega ? 520 : 440;
-      const entry = easeOutBack(clamp(finalElapsed / entryDuration, 0, 1));
-      const scale = (isMega ? 0.62 : 0.7) + entry * (isMega ? 0.38 : 0.3);
-      const pulse = 1 + Math.sin(time * (isMega ? 0.0075 : 0.0065)) * (isMega ? 0.022 : 0.014);
-      const burst = 1 - clamp(finalElapsed / (isMega ? 1250 : 950), 0, 1);
-      const artWidth = isMega ? 610 : 570;
-      const artHeight = isMega ? 500 : 400;
-      const artScale = scale * pulse;
-      const particleCount = isMega ? 24 : 16;
+      const variant = this.winVisualVariant % 3;
+      const entry = easeOutBack(clamp(elapsed / 430, 0, 1));
+      const impact = 1 - clamp(elapsed / 920, 0, 1);
+      const artScale = (0.66 + entry * 0.34) * (1 + Math.sin(time * 0.0062) * 0.012);
+      const direction = variant === 1 ? -1 : 1;
 
       ctx.save();
-      ctx.translate(cx, cy);
+      ctx.translate(390, 825 + (1 - entry) * 88);
 
-      // Halo orgânico local. Não existe mais retângulo preto sobre os rolos:
-      // o centro escuro termina suavemente poucos pixels além da própria arte.
-      const glowRadius = isMega ? 342 : 300;
-      const glow = ctx.createRadialGradient(0, 0, 18, 0, 0, glowRadius);
-      glow.addColorStop(0, isMega ? 'rgba(36,5,49,0.62)' : 'rgba(35,9,18,0.58)');
-      glow.addColorStop(0.54, isMega ? 'rgba(24,4,42,0.42)' : 'rgba(28,7,20,0.4)');
-      glow.addColorStop(0.82, isMega ? 'rgba(235,58,187,0.11)' : 'rgba(255,142,43,0.1)');
-      glow.addColorStop(1, 'rgba(8,2,18,0)');
-      ctx.fillStyle = glow;
+      // GRANDE GANHO: medalhão dourado com queda, impacto único e fonte de
+      // moedas. Movimento sólido, quente e curto; nenhuma espiral ou pétala.
+      const halo = ctx.createRadialGradient(0, 0, 20, 0, 0, 305);
+      halo.addColorStop(0, 'rgba(44,8,8,0.66)');
+      halo.addColorStop(0.58, 'rgba(39,7,12,0.4)');
+      halo.addColorStop(0.83, 'rgba(255,145,35,0.12)');
+      halo.addColorStop(1, 'rgba(10,2,13,0)');
       ctx.globalAlpha = appear;
+      ctx.fillStyle = halo;
       ctx.beginPath();
-      ctx.ellipse(0, 2, glowRadius, isMega ? 264 : 214, 0, 0, TAU);
+      ctx.ellipse(0, 0, 305, 218, 0, 0, TAU);
       ctx.fill();
 
-      // Explosão dourada no Grande; explosão rosa/dourada mais ampla no Mega.
       ctx.save();
-      ctx.rotate(time * (isMega ? 0.00009 : -0.000065));
+      ctx.rotate(direction * (0.06 - entry * 0.06) - time * 0.00005);
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = appear * (0.3 + burst * 0.5);
-      const rayCount = isMega ? 24 : 16;
-      for (let ray = 0; ray < rayCount; ray += 1) {
-        ctx.rotate(TAU / rayCount);
-        const rayLength = (isMega ? 295 : 250) + burst * (isMega ? 62 : 42);
-        const rayWidth = isMega && ray % 2 === 0 ? 8 : 5;
-        ctx.beginPath();
-        ctx.moveTo(isMega ? 92 : 80, -2);
-        ctx.lineTo(rayLength, -rayWidth);
-        ctx.lineTo(rayLength, rayWidth);
-        ctx.closePath();
-        ctx.fillStyle = isMega && ray % 3 === 0 ? '#ff79db' : ray % 2 === 0 ? '#fff2a4' : '#ffae35';
+      ctx.globalAlpha = appear * (0.24 + impact * 0.56);
+      for (let ray = 0; ray < 14; ray += 1) {
+        ctx.rotate(TAU / 14);
+        const length = 244 + impact * 52 + (ray % 2) * 14;
+        ctx.fillStyle = ray % 2 ? '#ff9f28' : '#fff0a0';
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = isMega ? 18 : 12;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.moveTo(92, -3);
+        ctx.lineTo(length, -5.5);
+        ctx.lineTo(length, 5.5);
+        ctx.closePath();
         ctx.fill();
       }
       ctx.restore();
 
-      // Ondas de choque. Grande recebe um pulso; Mega recebe dois pulsos
-      // alternados para comunicar uma categoria de prêmio mais rara.
-      const waveCount = isMega ? 2 : 1;
-      for (let wave = 0; wave < waveCount; wave += 1) {
-        const delay = wave * 360;
-        const waveProgress = clamp((finalElapsed - delay) / (isMega ? 1050 : 820), 0, 1);
-        if (waveProgress <= 0 || waveProgress >= 1) continue;
+      const impactWave = clamp((elapsed - 80) / 820, 0, 1);
+      if (impactWave > 0 && impactWave < 1) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = appear * (1 - waveProgress) * (isMega ? 0.82 : 0.68);
-        ctx.strokeStyle = isMega && wave % 2 === 0 ? '#ff78db' : '#ffd45c';
-        ctx.lineWidth = isMega ? 7 : 6;
-        ctx.shadowColor = ctx.strokeStyle;
-        ctx.shadowBlur = isMega ? 24 : 18;
+        ctx.globalAlpha = appear * (1 - impactWave) * 0.84;
+        ctx.strokeStyle = '#ffd75a';
+        ctx.lineWidth = 7 - impactWave * 3;
+        ctx.shadowColor = '#ff9d28';
+        ctx.shadowBlur = 22;
         ctx.beginPath();
-        ctx.ellipse(0, 0, 135 + waveProgress * (isMega ? 218 : 175), 92 + waveProgress * (isMega ? 150 : 108), 0, 0, TAU);
+        ctx.ellipse(0, 4, 126 + impactWave * 185, 84 + impactWave * 122, 0, 0, TAU);
         ctx.stroke();
         ctx.restore();
       }
 
-      // Partículas determinísticas: não tremem entre quadros. O Grande usa
-      // faíscas quentes; o Mega mistura energia rosa, ouro e pequenos pétalas.
-      for (let index = 0; index < particleCount; index += 1) {
-        const angle = (index / particleCount) * TAU + (isMega ? 0.2 : 0.05);
-        const travel = clamp(finalElapsed / (isMega ? 1050 : 820), 0, 1);
-        const radius = (isMega ? 118 : 98) + travel * (isMega ? 205 : 155) + Math.sin(time * 0.004 + index) * 9;
+      // Duas fontes laterais. Variação muda direção e altura, sem repetir
+      // composição imediatamente na próxima ativação.
+      for (let index = 0; index < 18; index += 1) {
+        const delay = 100 + (index % 9) * 48 + Math.floor(index / 9) * 90;
+        const progress = clamp((elapsed - delay) / 980, 0, 1);
+        if (progress <= 0 || progress >= 1) continue;
+        const side = index < 9 ? -1 : 1;
+        const lane = index % 9;
+        const x = side * (118 + progress * (118 + lane * 9 + variant * 7));
+        const y = 136 - Math.sin(progress * Math.PI) * (142 + lane * 7 + variant * 10) + progress * 76;
+        this.drawCelebrationCoin(x, y, 10 + (lane % 3) * 2.2, progress * direction * (5.4 + lane * 0.5), appear * Math.sin(progress * Math.PI));
+      }
+
+      for (let sparkle = 0; sparkle < 9; sparkle += 1) {
+        const angle = sparkle * (TAU / 9) + variant * 0.18;
+        const radius = 188 + ((sparkle * 31) % 78);
+        const twinkle = Math.max(0, Math.sin(time * 0.012 + sparkle * 1.7));
+        if (twinkle < 0.2) continue;
         const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius * 0.68;
-        const size = (isMega ? 5.5 : 4.2) + Math.sin(time * 0.011 + index * 1.7) * 1.6;
+        const y = Math.sin(angle) * radius * 0.7;
         ctx.save();
-        ctx.globalAlpha = appear * (0.42 + burst * 0.58);
+        ctx.translate(x, y);
+        ctx.rotate(Math.PI / 4);
         ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * twinkle;
+        ctx.fillStyle = '#fff2a2';
+        ctx.shadowColor = '#ffbd37';
+        ctx.shadowBlur = 15;
+        ctx.fillRect(-2, -10, 4, 20);
+        ctx.fillRect(-10, -2, 20, 4);
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.rotate(direction * (1 - entry) * 0.075);
+      ctx.scale(artScale * 1.045, artScale * 1.045);
+      ctx.globalAlpha = appear * 0.7;
+      ctx.filter = 'brightness(0) blur(14px)';
+      this.drawImageContain(artwork, 0, 0, 570, 400);
+      ctx.restore();
+
+      ctx.save();
+      ctx.rotate(direction * (1 - entry) * 0.075);
+      ctx.scale(artScale, artScale);
+      ctx.globalAlpha = appear;
+      ctx.shadowColor = '#ffc33d';
+      ctx.shadowBlur = 34 + impact * 28;
+      this.drawImageContain(artwork, 0, 0, 570, 400);
+      ctx.restore();
+      ctx.restore();
+    }
+
+    drawMegaWinArtwork(time, elapsed, appear) {
+      const artwork = ASSETS.megaWinTitle;
+      if (!artwork) return;
+      const ctx = this.ctx;
+      const variant = this.winVisualVariant % 3;
+      const direction = variant === 1 ? -1 : 1;
+      const accent = variant === 2 ? '#71e5ff' : '#ff65d2';
+      const entry = easeOutBack(clamp(elapsed / 620, 0, 1));
+      const energy = 1 - clamp(elapsed / 1550, 0, 1);
+      const artScale = (0.48 + entry * 0.52) * (1 + Math.sin(time * 0.0074) * 0.022);
+
+      ctx.save();
+      ctx.translate(390, 790 + Math.sin(time * 0.0042) * 5);
+
+      // MEGA GANHO: portal vivo. Entrada em profundidade, espirais, órbitas,
+      // três ondas, cometas e pétalas. Linguagem oposta ao impacto do Grande.
+      const halo = ctx.createRadialGradient(0, 0, 26, 0, 0, 360);
+      halo.addColorStop(0, 'rgba(30,3,48,0.72)');
+      halo.addColorStop(0.5, 'rgba(25,3,46,0.5)');
+      halo.addColorStop(0.78, variant === 2 ? 'rgba(61,190,255,0.15)' : 'rgba(244,63,191,0.17)');
+      halo.addColorStop(1, 'rgba(8,2,18,0)');
+      ctx.globalAlpha = appear;
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 360, 278, 0, 0, TAU);
+      ctx.fill();
+
+      // Espirais contínuas criam profundidade e deixam cada variação girar em
+      // direção/paleta diferente.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      for (let arm = 0; arm < 4; arm += 1) {
         ctx.beginPath();
-        ctx.arc(x, y, Math.max(2, size), 0, TAU);
-        ctx.fillStyle = isMega && index % 3 === 0 ? '#ff91df' : index % 2 === 0 ? '#fff2a4' : '#ffb43e';
+        for (let step = 0; step <= 34; step += 1) {
+          const radius = 76 + step * 7.5;
+          const angle = direction * (time * 0.00072 + arm * TAU / 4 + step * 0.135 + variant * 0.14);
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius * 0.72;
+          if (!step) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.globalAlpha = appear * (0.18 + energy * 0.34);
+        ctx.strokeStyle = arm % 2 ? '#ffd966' : accent;
+        ctx.lineWidth = arm % 2 ? 4 : 6;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 20;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      for (let wave = 0; wave < 3; wave += 1) {
+        const progress = clamp((elapsed - 80 - wave * 330) / 980, 0, 1);
+        if (progress <= 0 || progress >= 1) continue;
+        ctx.save();
+        ctx.rotate(direction * (wave - 1) * 0.08);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * (1 - progress) * (0.92 - wave * 0.12);
+        ctx.strokeStyle = wave === 1 ? '#ffd85b' : accent;
+        ctx.lineWidth = 8 - progress * 4;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 28;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 118 + progress * 238, 78 + progress * 168, 0, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Moedas em órbita: Mega não usa fontes laterais.
+      for (let coin = 0; coin < 12; coin += 1) {
+        const angle = direction * (time * (0.00065 + (coin % 3) * 0.00006)) + coin * TAU / 12 + variant * 0.22;
+        const orbit = 240 + (coin % 3) * 31;
+        const x = Math.cos(angle) * orbit;
+        const y = Math.sin(angle) * orbit * 0.72;
+        const depth = 0.58 + (Math.sin(angle) + 1) * 0.21;
+        this.drawCelebrationCoin(x, y, 9 + depth * 6, angle * 2.5, appear * depth, coin % 4 === 0 ? accent : '#ffd95d');
+      }
+
+      // Cometas radiais saem do portal em ritmos alternados.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round';
+      for (let comet = 0; comet < 16; comet += 1) {
+        const cycle = ((elapsed * 0.00115 + comet * 0.173 + variant * 0.11) % 1);
+        const angle = comet * TAU / 16 + variant * 0.09;
+        const start = 112 + cycle * 195;
+        const length = 22 + cycle * 34;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * start, Math.sin(angle) * start * 0.72);
+        ctx.lineTo(Math.cos(angle) * (start + length), Math.sin(angle) * (start + length) * 0.72);
+        ctx.globalAlpha = appear * (1 - cycle) * 0.76;
+        ctx.strokeStyle = comet % 3 ? accent : '#fff1a0';
+        ctx.lineWidth = comet % 3 ? 4 : 6;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 18;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let petal = 0; petal < 18; petal += 1) {
+        const angle = petal * TAU / 18 + direction * time * 0.00016;
+        const drift = 185 + ((petal * 43 + variant * 29) % 135) + Math.sin(time * 0.002 + petal) * 18;
+        ctx.save();
+        ctx.translate(Math.cos(angle) * drift, Math.sin(angle) * drift * 0.74);
+        ctx.rotate(angle + Math.PI / 2 + Math.sin(time * 0.003 + petal) * 0.5);
+        ctx.globalAlpha = appear * (0.44 + energy * 0.38);
+        ctx.fillStyle = petal % 3 === 0 ? '#fff0a0' : petal % 2 ? '#ffb5e6' : accent;
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = isMega ? 16 : 11;
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 4.5, 12, 0, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.restore();
+
+      const flash = clamp(elapsed / 120, 0, 1) * clamp((520 - elapsed) / 300, 0, 1);
+      if (flash > 0) {
+        const flashGlow = ctx.createRadialGradient(0, 0, 8, 0, 0, 250);
+        flashGlow.addColorStop(0, 'rgba(255,255,225,0.9)');
+        flashGlow.addColorStop(0.3, variant === 2 ? 'rgba(110,226,255,0.48)' : 'rgba(255,105,214,0.5)');
+        flashGlow.addColorStop(1, 'rgba(255,100,210,0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * flash;
+        ctx.fillStyle = flashGlow;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 250, 185, 0, 0, TAU);
         ctx.fill();
         ctx.restore();
       }
 
-      if (isMega) {
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = appear * (0.36 + burst * 0.42);
-        for (let petal = 0; petal < 12; petal += 1) {
-          const angle = petal * (TAU / 12) + time * 0.00012;
-          const drift = 200 + ((petal * 37) % 95) + Math.sin(time * 0.002 + petal) * 18;
-          ctx.save();
-          ctx.translate(Math.cos(angle) * drift, Math.sin(angle) * drift * 0.72);
-          ctx.rotate(angle + Math.PI / 2);
-          ctx.fillStyle = petal % 2 ? '#ffb8e8' : '#ff6fcf';
-          ctx.shadowColor = '#ff69cc';
-          ctx.shadowBlur = 13;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, 4.5, 11, 0, 0, TAU);
-          ctx.fill();
-          ctx.restore();
-        }
-        ctx.restore();
-      }
-
-      // A sombra escura e o neon usam o canal alpha da imagem. Assim a borda
-      // acompanha o arabesco da placa, sem qualquer caixa preta quadrada.
       ctx.save();
-      ctx.scale(artScale * 1.045, artScale * 1.045);
-      ctx.globalAlpha = appear * (isMega ? 0.74 : 0.68);
-      ctx.filter = `brightness(0) blur(${isMega ? 17 : 14}px)`;
-      this.drawImageContain(artwork, 0, 0, artWidth, artHeight);
+      ctx.rotate(direction * (1 - entry) * 0.13);
+      ctx.scale(artScale * 1.05, artScale * 1.05);
+      ctx.globalAlpha = appear * 0.78;
+      ctx.filter = 'brightness(0) blur(18px)';
+      this.drawImageContain(artwork, 0, 0, 620, 510);
       ctx.restore();
 
       ctx.save();
+      ctx.rotate(direction * (1 - entry) * 0.13);
       ctx.scale(artScale, artScale);
-      ctx.globalAlpha = appear * (isMega ? 0.34 : 0.26);
+      ctx.globalAlpha = appear * 0.38;
       ctx.globalCompositeOperation = 'lighter';
-      ctx.shadowColor = isMega ? '#ff55ce' : '#ffc341';
-      ctx.shadowBlur = isMega ? 54 + burst * 34 : 40 + burst * 26;
-      this.drawImageContain(artwork, 0, 0, artWidth, artHeight);
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 62 + energy * 38;
+      this.drawImageContain(artwork, 0, 0, 620, 510);
       ctx.restore();
 
       ctx.save();
+      ctx.rotate(direction * (1 - entry) * 0.13);
       ctx.scale(artScale, artScale);
       ctx.globalAlpha = appear;
-      ctx.shadowColor = isMega ? '#ff66d2' : '#ffc94c';
-      ctx.shadowBlur = isMega ? 42 + burst * 28 : 32 + burst * 22;
-      this.drawImageContain(artwork, 0, 0, artWidth, artHeight);
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 46 + energy * 30;
+      this.drawImageContain(artwork, 0, 0, 620, 510);
       ctx.restore();
+      ctx.restore();
+    }
+
+    drawCelebrationCoin(x, y, size, rotation, alpha, accent = '#ffd95d') {
+      if (alpha <= 0.01) return;
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = size * 0.9;
+      const face = ctx.createRadialGradient(-size * 0.28, -size * 0.32, 1, 0, 0, size);
+      face.addColorStop(0, '#fff5a6');
+      face.addColorStop(0.38, accent);
+      face.addColorStop(1, '#b95a0d');
+      ctx.fillStyle = face;
+      ctx.strokeStyle = '#fff0a0';
+      ctx.lineWidth = Math.max(1.5, size * 0.13);
+      ctx.beginPath();
+      ctx.arc(0, 0, size, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#7c3514';
+      ctx.fillRect(-size * 0.2, -size * 0.2, size * 0.4, size * 0.4);
+      ctx.strokeStyle = '#ffd76a';
+      ctx.lineWidth = Math.max(1, size * 0.09);
+      ctx.strokeRect(-size * 0.2, -size * 0.2, size * 0.4, size * 0.4);
       ctx.restore();
     }
 
@@ -2401,18 +2697,20 @@
       const ctx = this.ctx;
       ctx.save();
 
+      // VITÓRIA MÁXIMA: coroação solar. Identidade própria, acima do portal
+      // Mega: ouro puro, anéis contrapostos, ondas concêntricas e coroa orbital.
       ctx.save();
       ctx.translate(390, 640);
-      ctx.rotate(local * 0.00018);
+      ctx.rotate(local * 0.00024);
       ctx.globalCompositeOperation = 'screen';
       ctx.fillStyle = '#ffe77a';
-      ctx.globalAlpha = appear * 0.38;
-      for (let ray = 0; ray < 24; ray += 1) {
-        ctx.rotate(TAU / 24);
+      ctx.globalAlpha = appear * 0.48;
+      for (let ray = 0; ray < 32; ray += 1) {
+        ctx.rotate(TAU / 32);
         ctx.beginPath();
-        ctx.moveTo(55, -5);
-        ctx.lineTo(520, -13);
-        ctx.lineTo(520, 13);
+        ctx.moveTo(48, -4);
+        ctx.lineTo(535, -10 - (ray % 3) * 5);
+        ctx.lineTo(535, 10 + (ray % 3) * 5);
         ctx.closePath();
         ctx.fill();
       }
@@ -2429,20 +2727,98 @@
       ctx.stroke();
       ctx.restore();
 
+      // Clarão de coroação, concentrado no círculo. Pico nos primeiros 600 ms.
+      const flash = clamp(local / 90, 0, 1) * clamp((650 - local) / 380, 0, 1);
+      if (flash > 0) {
+        const flashGlow = ctx.createRadialGradient(390, 640, 10, 390, 640, 290);
+        flashGlow.addColorStop(0, 'rgba(255,255,235,0.96)');
+        flashGlow.addColorStop(0.22, 'rgba(255,232,89,0.62)');
+        flashGlow.addColorStop(0.62, 'rgba(255,145,25,0.22)');
+        flashGlow.addColorStop(1, 'rgba(255,130,10,0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * flash;
+        ctx.fillStyle = flashGlow;
+        ctx.beginPath();
+        ctx.arc(390, 640, 290, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Dois anéis reais giram em sentidos opostos. Visual cerimonial, sem
+      // repetir espirais, pétalas ou cometas usados pelo Mega Ganho.
+      for (let ring = 0; ring < 2; ring += 1) {
+        ctx.save();
+        ctx.translate(390, 640);
+        ctx.rotate((ring ? -1 : 1) * local * (ring ? 0.00115 : 0.00082));
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * (ring ? 0.72 : 0.9);
+        ctx.strokeStyle = ring ? '#ff9d28' : '#fff29b';
+        ctx.lineWidth = ring ? 7 : 9;
+        ctx.setLineDash(ring ? [18, 13] : [31, 17]);
+        ctx.lineDashOffset = ring ? local * 0.045 : -local * 0.035;
+        ctx.shadowColor = ring ? '#ff7a16' : '#ffe75a';
+        ctx.shadowBlur = ring ? 18 : 25;
+        ctx.beginPath();
+        ctx.arc(0, 0, ring ? 276 : 232, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Três ondas sucessivas anunciam patamar máximo.
+      for (let wave = 0; wave < 3; wave += 1) {
+        const progress = clamp((local - 70 - wave * 230) / 860, 0, 1);
+        if (progress <= 0 || progress >= 1) continue;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * (1 - progress) * (0.92 - wave * 0.12);
+        ctx.strokeStyle = wave === 1 ? '#ffb52d' : '#fff078';
+        ctx.lineWidth = 10 - progress * 6;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = 26;
+        ctx.beginPath();
+        ctx.arc(390, 640, 126 + progress * 206, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Coroa de moedas. Alternância de profundidade cria passagem pela frente
+      // e por trás do mascote sem usar a órbita elíptica do Mega.
+      for (let coin = 0; coin < 14; coin += 1) {
+        const angle = -local * (0.00082 + (coin % 2) * 0.00008) + coin * TAU / 14;
+        const radius = 270 + (coin % 2) * 28;
+        const x = 390 + Math.cos(angle) * radius;
+        const y = 640 + Math.sin(angle) * radius;
+        const depth = 0.62 + (Math.sin(angle) + 1) * 0.19;
+        this.drawCelebrationCoin(
+          x,
+          y,
+          10 + depth * 7,
+          angle * -2.8,
+          appear * depth,
+          coin % 3 === 0 ? '#fff39b' : '#ffd13f',
+        );
+      }
+
       const frame = [ASSETS.celebration3, ASSETS.celebration4, ASSETS.celebration5]
       [Math.floor(local / 230) % 3] || this.getIdleMascotFrame(time);
+      const mascotScale = 1 + Math.sin(local * 0.012) * 0.028;
+      ctx.save();
+      ctx.translate(390, 640 - Math.sin(local * 0.006) * 13);
+      ctx.scale(mascotScale, mascotScale);
       ctx.shadowColor = '#ffd94e';
-      ctx.shadowBlur = 38;
-      this.drawImageContain(frame, 390, 640 - Math.sin(local * 0.006) * 12, 360, 390);
+      ctx.shadowBlur = 48 + flash * 34;
+      this.drawImageContain(frame, 0, 0, 382, 412);
+      ctx.restore();
       ctx.globalAlpha = appear;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = '900 50px Georgia, serif';
-      ctx.lineWidth = 10;
+      ctx.font = '900 54px Georgia, serif';
+      ctx.lineWidth = 12;
       ctx.strokeStyle = '#63163f';
       ctx.fillStyle = '#fff18a';
       ctx.shadowColor = '#ffd132';
-      ctx.shadowBlur = 24;
+      ctx.shadowBlur = 30 + flash * 22;
       ctx.strokeText('VITÓRIA MÁXIMA', 390, 870);
       ctx.fillText('VITÓRIA MÁXIMA', 390, 870);
       ctx.restore();
@@ -2831,11 +3207,55 @@
       if (this.state === 'SPIN_LOOP' || this.state.startsWith('FEATURE_')) return;
       this.overlay = name;
       this.overlayScroll = 0;
+      this.overlayAfterClose = null;
+      this.overlayTransitionStart = performance.now();
+      this.overlayPhase = name === 'auto' ? 'opening' : 'open';
     }
 
-    closeOverlay() {
+    closeOverlay(afterClose = null) {
+      if (this.overlay === 'auto') {
+        if (this.overlayPhase === 'closing') {
+          if (afterClose) this.overlayAfterClose = afterClose;
+          return;
+        }
+        this.overlayPhase = 'closing';
+        this.overlayTransitionStart = performance.now();
+        this.overlayAfterClose = afterClose;
+        this.autoSliderDrag = false;
+        return;
+      }
+      this.finishOverlayClose(afterClose);
+    }
+
+    finishOverlayClose(afterClose = null) {
+      const callback = afterClose || this.overlayAfterClose;
       this.overlay = null;
       this.overlayScroll = 0;
+      this.overlayPhase = 'closed';
+      this.overlayTransitionStart = 0;
+      this.overlayAfterClose = null;
+      if (callback) callback();
+    }
+
+    updateOverlayTransition(time) {
+      if (this.overlay !== 'auto') return;
+      const elapsed = time - this.overlayTransitionStart;
+      if (this.overlayPhase === 'opening' && elapsed >= 320) this.overlayPhase = 'open';
+      if (this.overlayPhase === 'closing' && elapsed >= 240) this.finishOverlayClose();
+    }
+
+    getAutoOverlayTransition(time = this.renderTime) {
+      if (this.overlayPhase === 'open') return { opacity: 1, scale: 1, offsetY: 0 };
+      const closing = this.overlayPhase === 'closing';
+      const duration = closing ? 240 : 320;
+      const raw = clamp((time - this.overlayTransitionStart) / duration, 0, 1);
+      const visibility = closing ? 1 - easeInCubic(raw) : easeOutCubic(raw);
+      const scaleProgress = closing ? visibility : easeOutBack(raw);
+      return {
+        opacity: clamp(visibility, 0, 1),
+        scale: 0.88 + scaleProgress * 0.12,
+        offsetY: (1 - visibility) * 34,
+      };
     }
 
     overlayMaxScroll() {
@@ -2861,15 +3281,18 @@
     }
 
     startAuto(count) {
-      this.autoRemaining = count;
-      this.autoActive = true;
-      this.autoTotal = count;
-      this.autoStartBalance = this.balance;
-      this.autoLimits.loss = this.autoStopAmount;
-      this.closeOverlay();
-      this.message = `${count} RODADAS AUTOMÁTICAS`;
-      this.enqueuePanel(this.message, 'center', 3000);
-      if (this.state === 'IDLE') this.spin();
+      const activate = () => {
+        this.autoRemaining = count;
+        this.autoActive = true;
+        this.autoTotal = count;
+        this.autoStartBalance = this.balance;
+        this.autoLimits.loss = this.autoStopAmount;
+        this.message = `${count} RODADAS AUTOMÁTICAS`;
+        this.enqueuePanel(this.message, 'center', 3000);
+        if (this.state === 'IDLE') this.spin();
+      };
+      if (this.overlay === 'auto') this.closeOverlay(activate);
+      else activate();
     }
 
     adjustAutoStopAmount(direction) {
@@ -3071,8 +3494,14 @@
       const time = this.renderTime;
       const layout = this.getAutoOverlayLayout();
       const { panel, mapX, mapY, sliderStart, sliderEnd, sliderY } = layout;
-      ctx.fillStyle = '#050315d1';
+      const transition = this.getAutoOverlayTransition(time);
+      ctx.fillStyle = `rgba(5,3,21,${0.82 * transition.opacity})`;
       ctx.fillRect(0, 0, W, H);
+      ctx.save();
+      ctx.globalAlpha = transition.opacity;
+      ctx.translate(panel.x + panel.w / 2, panel.y + panel.h / 2 + transition.offsetY);
+      ctx.scale(transition.scale, transition.scale);
+      ctx.translate(-(panel.x + panel.w / 2), -(panel.y + panel.h / 2));
       ctx.save();
       ctx.shadowColor = '#18022f';
       ctx.shadowBlur = 34;
@@ -3179,6 +3608,7 @@
       this.drawImageContain(ASSETS.autoClose, 0, 0, closeW, closeH);
       ctx.restore();
       this.hit(closeX - closeW / 2 - 10, closeY - closeH / 2 - 10, closeW + 20, closeH + 20, () => this.closeOverlay(), 'auto-close');
+      ctx.restore();
     }
 
     drawPaytableOverlay() {
