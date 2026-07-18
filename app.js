@@ -97,7 +97,7 @@
   };
   const ASSETS = {};
 
-  function loadAssets(onProgress = () => {}) {
+  function loadAssets(onProgress = () => { }) {
     const entries = Object.entries(ASSET_PATHS);
     let loaded = 0;
     onProgress(loaded, entries.length);
@@ -1200,10 +1200,10 @@
       ctx.globalAlpha = 0.58;
       const driftA = Math.sin(time * 0.00012) * 24;
       const driftB = Math.sin(time * 0.00009 + 2.4) * 20;
-      this.drawImageContain(ASSETS.cloud1, 184 + driftA, 365, 220, 92);
-      this.drawImageContain(ASSETS.cloud2, 603 + driftB, 390, 190, 88);
+      this.drawImageContain(ASSETS.cloud1, 184 + driftA, 285, 220, 92);
+      this.drawImageContain(ASSETS.cloud2, 603 + driftB, 350, 190, 88);
       ctx.globalAlpha = 0.32;
-      this.drawImageContain(ASSETS.cloud2, 410 - driftA * 0.45, 282, 130, 62);
+      this.drawImageContain(ASSETS.cloud2, 410 - driftA * 0.45, 225, 130, 62);
       ctx.restore();
     }
 
@@ -2430,18 +2430,17 @@
       ctx.restore();
 
       const betCenterX = panel.x + panel.w * 0.75;
-      if (this.level > 1 && this.level < 10) {
+      const hasBetLevel = this.level > 1 && this.level < 10;
+      if (hasBetLevel) {
+        // "APOSTA" já vem no painel. O nível fica ao lado, formando um único título.
         ctx.fillStyle = '#ffe16a';
-        ctx.font = '900 14px Arial Black, Arial';
-        ctx.fillText(`NÍVEL ${this.level}`, betCenterX, 1411);
-        ctx.fillStyle = '#fff9e5';
         ctx.font = '900 24px Arial Black, Arial';
-        ctx.fillText(money(this.bet), betCenterX, 1439);
-      } else {
-        ctx.fillStyle = '#fff9e5';
-        ctx.font = '900 25px Arial Black, Arial';
-        ctx.fillText(money(this.bet), betCenterX, 1428);
+        ctx.fillText(String(this.level), betCenterX + 55, 1393);
       }
+      ctx.fillStyle = '#fff9e5';
+      ctx.font = '900 25px Arial Black, Arial';
+      // Mantém o valor na mesma linha, peso e escala do saldo.
+      ctx.fillText(money(this.bet), betCenterX - (hasBetLevel ? 18 : 10), 1428);
       this.hit(390, panel.y, panel.w / 2, panel.h, () => this.state === 'IDLE' && this.openOverlay('bet'));
       ctx.restore();
     }
