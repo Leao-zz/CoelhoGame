@@ -10,30 +10,57 @@
   const easeOutBack = (t) => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
   const PANEL_X = 90;
   const PANEL_W = 600;
+  const DISPLAY_Y = 1208;
+  const REEL_FRAME = { x: -60, y: 378, w: 900, h: 840 };
   const PANEL_DEFAULT_DURATION = 5200;
+  const AUTO_STOP_MIN = 1600;
+  const AUTO_STOP_MAX = 3200;
+  const AUTO_STOP_STEP = 100;
+  const WIN_TIER_CONFIG = Object.freeze({
+    small: {
+      minRatio: 0, maxRatio: 2, label: 'GANHO', settle: 220, lineDuration: 650,
+      finalHold: 900, sparks: 12, coins: 0, mascotDelay: 720, mascotDuration: 650,
+    },
+    medium: {
+      minRatio: 2, maxRatio: 10, label: 'ÓTIMO GANHO', settle: 220, lineDuration: 760,
+      finalHold: 1200, sparks: 30, coins: 9, mascotDelay: 900, mascotDuration: 1600,
+    },
+    big: {
+      minRatio: 10, maxRatio: 50, label: 'GRANDE GANHO', settle: 240, lineDuration: 820,
+      finalHold: 1900, sparks: 62, coins: 38, mascotDelay: 1050, mascotDuration: 2400,
+    },
+    mega: {
+      minRatio: 50, maxRatio: 100, label: 'MEGA GANHO', settle: 250, lineDuration: 880,
+      finalHold: 2600, sparks: 90, coins: 72, mascotDelay: 1150, mascotDuration: 3200,
+    },
+    max: {
+      minRatio: 100, maxRatio: Infinity, label: 'VITÓRIA MÁXIMA', settle: 250, lineDuration: 900,
+      finalHold: 3400, sparks: 130, coins: 120, mascotDelay: 1200, mascotDuration: 4200,
+    },
+  });
 
   const { PAYLINES, SYMBOLS, FEATURE_TRIGGER_RATE, evaluateGrid, makeMixedWinGrid } = window.CoelhoMath;
   const REEL_LAYOUT = [
-    { x: 79, y: 509, w: 198, h: 669, rows: 3, cellH: 223 },
-    { x: 290, y: 466, w: 200, h: 762, rows: 4, cellH: 190.5 },
-    { x: 503, y: 509, w: 198, h: 669, rows: 3, cellH: 223 },
+    { x: 31, y: 449, w: 229, h: 704, rows: 3, cellH: 234.67 },
+    { x: 275, y: 403, w: 231, h: 802, rows: 4, cellH: 200.5 },
+    { x: 520, y: 449, w: 229, h: 704, rows: 3, cellH: 234.67 },
   ];
   const LINE_RAILS = {
     left: [2, 3, 1, 6, 7, 4, 5, 10, 8, 9],
     right: [2, 4, 1, 6, 8, 3, 5, 10, 7, 9],
   };
-  const LINE_RAIL_Y = [565, 620, 675, 760, 815, 870, 925, 1025, 1080, 1135];
+  const LINE_RAIL_Y = [507, 565, 623, 713, 770, 828, 886, 992, 1050, 1108];
   const ASSET_PATHS = {
     sky: 'assets/layout-v3/fundo.png',
     roofLeft: 'assets/layout-v3/telhado_esquerda.png',
     roofRight: 'assets/layout-v3/telhado_direita.png',
-    lantern: 'assets/layout-v3/balao.png',
+    lantern: 'assets/layout-v3/balao_longo.png',
     cloud1: 'assets/layout-v3/nuvem1.png',
     cloud2: 'assets/layout-v3/nuvem2.png',
     logo: 'assets/layout-v3/logo.png',
     menuButton: 'assets/layout-v3/btn_menu.png',
     reelFrame: 'assets/layout-v3/central_rolos.png',
-    displayFrame: 'assets/layout-v3/display.png',
+    displayFrame: 'assets/layout-v3/display_novo.png',
     scoreFrame: 'assets/layout-v3/saldo_aposta.png',
     lowerOrnament: 'assets/layout-v3/arabesco_baixo.png',
     turboButton: 'assets/layout-v3/btn_turbo.png',
@@ -62,6 +89,13 @@
     idle5: 'assets/idle/clean/animacao_parado5.png',
     openingBackground: 'assets/opening/clean/fundo_abertura.jpg',
     openingButton: 'assets/opening/clean/fundo_botao.png',
+    autoPanel: 'assets/automatic/tela_automatica.png',
+    autoSelection: 'assets/automatic/marcacao_numeros.png',
+    autoSliderKnob: 'assets/automatic/botao_spin.png',
+    autoMinus: 'assets/automatic/menos.png',
+    autoPlus: 'assets/automatic/mais.png',
+    autoStart: 'assets/automatic/iniciar.png',
+    autoClose: 'assets/automatic/fechar.png',
   };
   const ASSETS = {};
 
@@ -74,6 +108,7 @@
     })));
   }
   const PANEL_TIPS = [
+    { text: 'SÍMBOLOS DE PRÊMIO PAGAM ATÉ 500x!', mode: 'center', duration: 3400 },
     { text: '5 OU MAIS PRÊMIOS PAGAM TODOS!', mode: 'center', duration: 3200 },
     { text: '8 RODADAS DA FORTUNA COM SÍMBOLOS DE PRÊMIO!', mode: 'scroll' },
     { text: 'WILD SUBSTITUI SÍMBOLOS COMUNS!', mode: 'center', duration: 3200 },
@@ -253,12 +288,15 @@
       this.balance = 250;
       this.baseBet = 0.05;
       this.level = 4;
+      this.spinBet = this.bet;
       this.lastWin = 0;
       this.turbo = false;
       this.autoRemaining = 0;
       this.autoActive = false;
       this.autoStartBalance = this.balance;
-      this.autoLimits = { loss: 0, gain: 0, single: 0 };
+      this.autoLimits = { loss: AUTO_STOP_MIN, gain: 0, single: 0 };
+      this.autoSelectedCount = 10;
+      this.autoStopAmount = AUTO_STOP_MIN;
       this.featureRemaining = 0;
       this.featureTotal = 0;
       this.featureIntroStart = 0;
@@ -266,7 +304,7 @@
       this.activeFeatureSpin = false;
       this.pendingFeature = false;
       const query = new URLSearchParams(window.location.search);
-      const demoMode = query.get('demo');
+      const demoMode = query.get('demo') || '';
       this.forceFeature = demoMode === 'feature';
       this.forceLines = demoMode === 'lines';
       this.forceLine1 = demoMode === 'line1';
@@ -274,6 +312,7 @@
       this.forcePrize = demoMode === 'prize';
       this.forceMax = demoMode === 'max';
       this.forceMixed = demoMode === 'mixed';
+      this.forceWinTier = demoMode.startsWith('tier-') ? demoMode.slice(5) : null;
       this.overlay = null;
       this.overlayScroll = 0;
       this.dragStart = null;
@@ -293,6 +332,9 @@
       this.autoTotal = 0;
       this.buttonPress = null;
       this.celebrateWin = false;
+      this.winTier = 'small';
+      this.winEffectsStarted = false;
+      this.balancePulseStart = 0;
       this.reels = REEL_LAYOUT.map((layout, index) => ({
         ...layout,
         index,
@@ -346,7 +388,15 @@
     }
 
     makeGrid(feature = false) {
-      return window.CoelhoMath.makeGrid(feature);
+      return this.freezePrizeValues(window.CoelhoMath.makeGrid(feature), this.bet);
+    }
+
+    freezePrizeValues(grid, bet = this.bet) {
+      grid.forEach((column) => column.forEach((symbol) => {
+        if (symbol.type !== 'prize' || Number.isFinite(symbol.prizeAmount)) return;
+        symbol.prizeAmount = (symbol.prize || 0.5) * bet;
+      }));
+      return grid;
     }
 
     makeShowcaseGrid() {
@@ -464,10 +514,11 @@
         const phase = this.getWinLinePhase(time);
         this.lineCycle = phase.index;
         this.lineShowAll = phase.showAll;
-        if (!phase.showAll && phase.index !== this.lastLineSoundIndex) {
+        if (this.lastWin > 0 && !phase.settling && !this.winEffectsStarted) this.startWinEffects(time);
+        if (!phase.settling && !phase.showAll && phase.index !== this.lastLineSoundIndex) {
           this.lastLineSoundIndex = phase.index;
           this.sound.lineWin(phase.index);
-          this.launchLineTransfer(this.result.lines[phase.index], time);
+          this.launchWinTransfer(this.getWinSteps()[phase.index], time);
         }
         const accounting = this.getWinAccounting(time);
         if (accounting.transferProgress >= 1) this.completeBalanceTransfer();
@@ -493,38 +544,58 @@
     }
 
     getWinLinePhase(time) {
-      const count = this.result.lines.length;
-      if (!count) return { index: 0, showAll: true };
+      const count = this.getWinSteps().length;
       const timing = this.getWinTiming();
       const elapsed = time - this.winStart;
-      if (elapsed < timing.allDuration) return { index: 0, showAll: true };
+      if (elapsed < timing.settleDuration) return { index: -1, showAll: false, settling: true };
+      if (!count || elapsed >= timing.stepEnd) return { index: Math.max(0, count - 1), showAll: true, settling: false };
       return {
-        index: Math.min(count - 1, Math.floor((elapsed - timing.allDuration) / timing.lineDuration)),
+        index: Math.min(count - 1, Math.floor((elapsed - timing.settleDuration) / timing.stepDuration)),
         showAll: false,
+        settling: false,
       };
     }
 
+    getWinSteps() {
+      const steps = this.result.lines.map((line) => ({
+        kind: 'line',
+        index: line.index,
+        amount: line.amount,
+        cells: line.cells,
+      }));
+      if ((this.result.prizes || []).length >= 5) {
+        this.result.prizes.forEach((prize, index) => steps.push({
+          kind: 'prize',
+          index: index + 1,
+          amount: prize.value * this.spinBet,
+          cells: [{ c: prize.c, r: prize.r }],
+        }));
+      }
+      return steps;
+    }
+
     getWinTiming() {
-      const count = this.result.lines.length;
-      const allDuration = this.turbo ? 340 : 1500;
-      const lineDuration = count ? (this.turbo ? 240 : clamp(6800 / count, 820, 1220)) : 0;
-      const lineEnd = allDuration + lineDuration * count;
-      const lineRawTotal = this.result.lines.reduce((sum, line) => sum + line.amount, 0);
-      const prizeExtra = Math.max(0, this.result.total - Math.min(this.result.total, lineRawTotal));
-      const prizeDuration = prizeExtra > 0 || !count ? (this.turbo ? 340 : 900) : 0;
-      const transferStart = lineEnd + prizeDuration + (this.turbo ? 100 : 360);
-      const transferDuration = this.turbo ? 260 : 720;
-      const holdDuration = this.turbo ? 160 : 420;
+      const config = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.small;
+      const steps = this.getWinSteps();
+      const count = steps.length;
+      const settleDuration = this.turbo ? 90 : config.settle;
+      const stepDuration = count ? (this.turbo ? 240 : config.lineDuration) : 0;
+      const stepEnd = settleDuration + stepDuration * count;
+      const rawStepTotal = steps.reduce((sum, step) => sum + step.amount, 0);
+      const extraAmount = Math.max(0, this.result.total - Math.min(this.result.total, rawStepTotal));
+      const finalDuration = this.turbo ? 520 : config.finalHold;
+      const transferStart = stepEnd + Math.max(this.turbo ? 120 : 320, finalDuration * 0.34);
+      const transferDuration = this.turbo ? 240 : Math.min(760, finalDuration * 0.42);
       return {
-        allDuration,
-        lineDuration,
-        lineEnd,
-        lineRawTotal,
-        prizeExtra,
-        prizeDuration,
+        settleDuration,
+        stepDuration,
+        stepEnd,
+        rawStepTotal,
+        extraAmount,
+        finalDuration,
         transferStart,
         transferDuration,
-        totalDuration: transferStart + transferDuration + holdDuration,
+        totalDuration: stepEnd + finalDuration,
       };
     }
 
@@ -533,29 +604,26 @@
         return { counted: 0, gain: 0, balance: this.balance, transferProgress: 1 };
       }
       if (this.winCredited) {
-        return { counted: this.lastWin, gain: 0, balance: this.balance, transferProgress: 1 };
+        return { counted: this.lastWin, gain: this.lastWin, balance: this.balance, transferProgress: 1 };
       }
       const timing = this.getWinTiming();
       const elapsed = Math.max(0, time - this.winStart);
-      const lineScale = timing.lineRawTotal > this.result.total ? this.result.total / timing.lineRawTotal : 1;
-      const prizeAmounts = (this.result.prizes || []).length >= 5
-        ? this.result.prizes.map((prize) => prize.value * this.bet)
-        : [];
+      const steps = this.getWinSteps();
+      const stepScale = timing.rawStepTotal > this.result.total ? this.result.total / timing.rawStepTotal : 1;
       const minimumWin = Math.min(
         this.result.total,
-        ...this.result.lines.map((line) => line.amount * lineScale),
-        ...prizeAmounts,
+        ...steps.map((step) => step.amount * stepScale),
       );
       let countedFromZero = 0;
-      this.result.lines.forEach((line, index) => {
-        const start = timing.allDuration + index * timing.lineDuration;
-        const raw = timing.lineDuration ? clamp(((elapsed - start) / timing.lineDuration) * 3, 0, 1) : 1;
+      steps.forEach((step, index) => {
+        const start = timing.settleDuration + index * timing.stepDuration;
+        const raw = timing.stepDuration ? clamp(((elapsed - start) / timing.stepDuration) * 2.6, 0, 1) : 1;
         const eased = raw * raw * (3 - 2 * raw);
-        countedFromZero += line.amount * lineScale * eased;
+        countedFromZero += step.amount * stepScale * eased;
       });
-      if (timing.prizeExtra > 0) {
-        const raw = clamp(((elapsed - timing.lineEnd) / Math.max(1, timing.prizeDuration)) * 3, 0, 1);
-        countedFromZero += timing.prizeExtra * raw * raw * (3 - 2 * raw);
+      if (timing.extraAmount > 0) {
+        const raw = clamp(((elapsed - timing.stepEnd) / Math.max(1, timing.finalDuration * 0.3)) * 2.6, 0, 1);
+        countedFromZero += timing.extraAmount * raw * raw * (3 - 2 * raw);
       }
       const zeroProgress = clamp(countedFromZero / this.result.total, 0, 1);
       const counted = minimumWin + (this.result.total - minimumWin) * zeroProgress;
@@ -563,7 +631,7 @@
       const easedTransfer = transferProgress * transferProgress * (3 - 2 * transferProgress);
       return {
         counted,
-        gain: counted * (1 - easedTransfer),
+        gain: counted,
         balance: this.balance + this.result.total * easedTransfer,
         transferProgress,
       };
@@ -573,6 +641,7 @@
       if (this.winCredited || this.lastWin <= 0) return;
       this.balance += this.lastWin;
       this.winCredited = true;
+      this.balancePulseStart = performance.now();
       this.checkAutoLimits();
     }
 
@@ -592,6 +661,12 @@
     enqueuePanel(text, mode = 'center', duration = 3200) {
       if (!text || this.tickerText === text || this.panelQueue.some((item) => item.text === text)) return;
       this.panelQueue.push({ text, mode, duration });
+    }
+
+    showPanelNow(text, mode = 'center', duration = 3200) {
+      if (!text) return;
+      this.panelQueue = this.panelQueue.filter((item) => !item.text.startsWith('APOSTA '));
+      this.activatePanelItem({ text, mode, duration }, performance.now());
     }
 
     advancePanel(time) {
@@ -623,6 +698,19 @@
       this.paylinePreviewStart = now;
       this.paylinePreviewUntil = now + 2800;
       this.enqueuePanel(`10 LINHAS ATIVAS • APOSTA ${money(this.bet)}`, 'center', 3000);
+    }
+
+    adjustBetLevel(direction) {
+      if (this.state !== 'IDLE') return;
+      const nextLevel = clamp(this.level + direction, 1, 10);
+      this.level = nextLevel;
+      const message = nextLevel === 10
+        ? `APOSTA 10 • MÁXIMA • ${money(this.bet)}`
+        : nextLevel === 1
+          ? `APOSTA 1 • MÍNIMA • ${money(this.bet)}`
+          : `APOSTA ${nextLevel} • ${money(this.bet)}`;
+      this.message = message;
+      this.showPanelNow(message, 'center', 2600);
     }
 
     getPaylinePreview(time) {
@@ -678,7 +766,8 @@
         this.enqueuePanel(this.message, 'center', 3200);
         return;
       }
-      if (!featureSpin) this.balance -= this.bet;
+      this.spinBet = this.bet;
+      if (!featureSpin) this.balance -= this.spinBet;
       else this.featureRemaining -= 1;
       this.activeFeatureSpin = featureSpin;
       if (!featureSpin && this.autoRemaining > 0) this.autoRemaining -= 1;
@@ -712,7 +801,11 @@
         this.grid = [3, 4, 3].map((rows) => Array.from({ length: rows }, () => ({ type: 'prize', prize: 500 })));
       }
       if (this.forceMixed && !featureSpin) this.grid = makeMixedWinGrid();
-      const deterministicDemo = this.forceLines || this.forceLine1 || this.forceLines35 || this.forcePrize || this.forceMax || this.forceMixed;
+      if (this.forceWinTier && !featureSpin) {
+        this.grid = [3, 4, 3].map((rows) => Array.from({ length: rows }, () => ({ type: 'carrot', prize: 0 })));
+      }
+      this.freezePrizeValues(this.grid, this.spinBet);
+      const deterministicDemo = this.forceLines || this.forceLine1 || this.forceLines35 || this.forcePrize || this.forceMax || this.forceMixed || this.forceWinTier;
       this.pendingFeature = !featureSpin && !deterministicDemo && (this.forceFeature || Math.random() < FEATURE_TRIGGER_RATE);
       this.forceFeature = false;
       this.forceLines = false;
@@ -731,6 +824,7 @@
       this.state = 'SPIN_LOOP';
       this.spinStart = performance.now();
       this.message = featureSpin ? 'RODADA DA FORTUNA' : 'BOA SORTE!';
+      this.showPanelNow(this.message, 'center', 2600);
       this.sound.startSpin();
       this.announce(featureSpin ? 'Rodada da Fortuna iniciada' : 'Giro iniciado');
     }
@@ -758,12 +852,22 @@
     finishSpin(time) {
       this.sound.stopSpin();
       this.result = this.evaluate();
+      if (this.forceWinTier && WIN_TIER_CONFIG[this.forceWinTier] && this.result.total > 0) {
+        const demoRatio = { small: 1, medium: 5, big: 20, mega: 60, max: 120 }[this.forceWinTier];
+        const target = this.spinBet * demoRatio;
+        const scale = target / this.result.total;
+        this.result.lines.forEach((line) => { line.amount *= scale; });
+        this.result.total = target;
+        this.forceWinTier = null;
+      }
       this.lastWin = this.result.total;
       this.winCredited = this.result.total <= 0;
       if (this.activeFeatureSpin) this.featureTotal += this.result.total;
       this.winStart = time;
       this.lastLineSoundIndex = -1;
-      this.celebrateWin = this.result.total >= this.bet * 2 || this.result.lines.length >= 3 || (this.result.prizes || []).length >= 5;
+      this.winTier = this.getWinTier();
+      this.winEffectsStarted = false;
+      this.celebrateWin = this.winTier !== 'small';
 
       if (this.pendingFeature && this.featureRemaining === 0) {
         this.featureRemaining = 8;
@@ -772,7 +876,7 @@
 
       this.history.unshift({
         time: new Date(),
-        bet: this.activeFeatureSpin ? 0 : this.bet,
+        bet: this.activeFeatureSpin ? 0 : this.spinBet,
         win: this.result.total,
         feature: this.activeFeatureSpin,
         id: `${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
@@ -789,9 +893,6 @@
           duration: (this.getWinTiming().totalDuration + 1000) / 1.6,
         }, time);
         if (this.pendingFeature) this.enqueuePanel('8 RODADAS DA FORTUNA!', 'center', 3400);
-        this.sound.win(this.result.total >= this.bet * 10);
-        this.burst(W / 2, 1130, this.result.total >= this.bet * 10 ? 70 : 34, '#ffd44d');
-        if (this.result.total >= this.bet * 500) this.coinRain(70);
         this.announce(`Você ganhou ${money(this.result.total)}`);
       } else {
         this.state = this.pendingFeature ? 'WIN' : 'NO_WIN';
@@ -825,7 +926,46 @@
     }
 
     evaluate() {
-      return evaluateGrid(this.grid, this.bet, this.lineStake);
+      const lineStake = this.spinBet / 10;
+      return evaluateGrid(this.grid, this.spinBet, lineStake);
+    }
+
+    getWinTier() {
+      if (!this.result.total || !this.spinBet) return 'small';
+      const ratio = this.result.total / this.spinBet;
+      return Object.entries(WIN_TIER_CONFIG)
+        .find(([, config]) => ratio >= config.minRatio && ratio < config.maxRatio)?.[0] || 'max';
+    }
+
+    startWinEffects(time) {
+      if (this.winEffectsStarted) return;
+      this.winEffectsStarted = true;
+      const config = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.small;
+      this.sound.win(this.winTier === 'big' || this.winTier === 'mega' || this.winTier === 'max');
+      this.burst(W / 2, 1120, config.sparks, '#ffd44d');
+      if (config.coins) this.coinRain(config.coins);
+      if (this.winTier === 'mega' || this.winTier === 'max') this.launchCelebrationConfetti(this.winTier === 'max' ? 68 : 38);
+      this.balancePulseStart = 0;
+      this.winEffectStartedAt = time;
+    }
+
+    launchCelebrationConfetti(count) {
+      const kinds = ['confetti', 'carrot', 'frd'];
+      for (let index = 0; index < count; index += 1) {
+        this.particles.push({
+          x: 70 + Math.random() * (W - 140),
+          y: 250 + Math.random() * 520,
+          vx: (Math.random() - 0.5) * 0.12,
+          vy: -0.12 - Math.random() * 0.12,
+          life: 1800 + Math.random() * 1800,
+          maxLife: 3600,
+          size: 7 + Math.random() * 9,
+          rotation: Math.random() * TAU,
+          spin: (Math.random() - 0.5) * 0.018,
+          color: index % 2 ? '#a94ed4' : '#ffd84c',
+          kind: kinds[index % kinds.length],
+        });
+      }
     }
 
     burst(x, y, count, color) {
@@ -847,14 +987,14 @@
       }
     }
 
-    launchLineTransfer(line, time) {
-      if (!line) return;
-      const centerCell = line.cells.find((cell) => cell.c === 1) || line.cells[1];
+    launchWinTransfer(step, time) {
+      if (!step || !step.cells?.length) return;
+      const centerCell = step.cells.find((cell) => cell.c === 1) || step.cells[Math.floor(step.cells.length / 2)];
       const reel = REEL_LAYOUT[centerCell.c];
       this.moneyTransfers.push({
         x: reel.x + reel.w / 2,
         y: reel.y + centerCell.r * reel.cellH + reel.cellH / 2,
-        amount: line.amount,
+        amount: step.amount,
         started: time,
         duration: this.turbo ? 460 : 900,
         seed: Math.random() * TAU,
@@ -865,7 +1005,7 @@
     drawMoneyTransfers(time) {
       const ctx = this.ctx;
       const targetX = 390;
-      const targetY = 1319;
+      const targetY = 1425;
       this.moneyTransfers.forEach((transfer) => {
         const count = this.turbo ? 6 : 10;
         for (let index = 0; index < count; index += 1) {
@@ -929,11 +1069,12 @@
       this.drawPaylinePreview(time);
       this.drawWinLayer(time);
       this.drawLineRails(time);
-      this.drawTicker();
-      this.drawStatus();
-      this.drawControls(time);
       this.drawParticles();
+      this.drawStatus();
+      this.drawTicker();
+      if (!(this.state === 'WIN' && this.winTier === 'max')) this.drawControls(time);
       this.drawMoneyTransfers(time);
+      this.drawMaxWinOverlay(time);
       this.drawFeatureOverlay(time);
       if (this.overlay) {
         this.hitAreas = [];
@@ -971,21 +1112,26 @@
       const mascotLean = mascotSpinning
         ? Math.sin(time * 0.012) * 0.025
         : Math.sin(time * 0.00125) * 0.008;
-      if (mascotWinning && this.celebrateWin && time - this.winStart < 2300) {
+      const winConfig = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.small;
+      const winElapsed = time - this.winStart;
+      const celebrationStart = this.getWinTiming().stepEnd + Math.min(180, winConfig.mascotDelay * 0.18);
+      if (mascotWinning && this.celebrateWin && winElapsed >= celebrationStart && winElapsed < celebrationStart + winConfig.mascotDuration) {
         this.drawCelebrationMascot(time);
       } else {
         const idleFrame = this.getIdleMascotFrame(time);
         ctx.save();
-        ctx.translate(390, 326 + mascotBob);
+        ctx.translate(390, 315 + mascotBob);
         ctx.rotate(mascotLean);
         if (mascotWinning) {
           ctx.shadowColor = '#ffd85e';
           ctx.shadowBlur = 20 + Math.sin(time * 0.012) * 7;
         }
-        this.drawImageContain(idleFrame, 0, 0, 252, 272);
+        const mascotScale = mascotWinning && this.winTier === 'small' ? 1.035 : 1;
+        ctx.scale(mascotScale, mascotScale);
+        this.drawImageContain(idleFrame, 0, 0, 246, 266);
         ctx.restore();
       }
-      this.drawImageContain(ASSETS.logo, 390, 112, 420, 225);
+      this.drawImageContain(ASSETS.logo, 390, 91, 326, 174);
       this.drawAmbientWisps(time);
       if (this.activeFeatureSpin || this.featureRemaining > 0 || this.state.startsWith('FEATURE_')) {
         const fortune = ctx.createRadialGradient(390, 820, 30, 390, 820, 760);
@@ -1043,17 +1189,20 @@
     }
 
     drawCelebrationMascot(time) {
-      const elapsed = Math.max(0, time - this.winStart);
+      const config = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.medium;
+      const celebrationStart = this.getWinTiming().stepEnd + Math.min(180, config.mascotDelay * 0.18);
+      const elapsed = Math.max(0, time - this.winStart - celebrationStart);
       const frames = [ASSETS.celebration1, ASSETS.celebration2, ASSETS.celebration3, ASSETS.celebration4, ASSETS.celebration5];
       const frame = frames[Math.min(frames.length - 1, Math.floor(elapsed / 190))] || this.getIdleMascotFrame(time);
       const appear = easeOutBack(clamp(elapsed / 330, 0, 1));
-      const jump = -Math.sin(clamp(elapsed / 1100, 0, 1) * Math.PI) * 42;
-      const sway = Math.sin(elapsed * 0.012) * 0.025;
+      const strength = { medium: 0.55, big: 0.82, mega: 1, max: 1.12 }[this.winTier] || 0.5;
+      const jump = -Math.sin(clamp(elapsed / 1100, 0, 1) * Math.PI) * 42 * strength;
+      const sway = Math.sin(elapsed * 0.012) * 0.025 * strength;
       const ctx = this.ctx;
       ctx.save();
       ctx.translate(390, 318 + jump);
       ctx.rotate(sway);
-      ctx.scale(appear, appear);
+      ctx.scale(appear * (0.96 + strength * 0.06), appear * (0.96 + strength * 0.06));
       ctx.shadowColor = '#ffd75b';
       ctx.shadowBlur = 28 + Math.sin(time * 0.015) * 8;
       this.drawImageContain(frame, 0, 0, 292, 310);
@@ -1130,9 +1279,10 @@
       if (roof) ctx.drawImage(roof, roofX, roofY, roofW, roofH);
       if (!lantern) return;
       const lanternW = 64;
-      const lanternH = 115;
+      const lanternH = 132;
       const lanternX = left ? 99 : 617;
-      const lanternY = 224;
+      // Keep the rope anchored directly under the roof ornament.
+      const lanternY = 204;
       const pivotX = lanternX + lanternW / 2;
       const sway = Math.sin(time * 0.00115 + (left ? 0 : 1.7)) * 0.032;
       const glowPulse = 0.78 + Math.sin(time * 0.0034 + (left ? 0.4 : 2.1)) * 0.22;
@@ -1140,7 +1290,7 @@
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       const glowX = lanternX + lanternW * 0.5;
-      const glowY = lanternY + lanternH * 0.47;
+      const glowY = lanternY + lanternH * 0.54;
       const glow = ctx.createRadialGradient(glowX, glowY, 2, glowX, glowY, lanternW * 0.78);
       glow.addColorStop(0, `rgba(255, 238, 125, ${0.42 * glowPulse})`);
       glow.addColorStop(0.38, `rgba(255, 101, 41, ${0.22 * glowPulse})`);
@@ -1279,7 +1429,7 @@
 
     drawReelFrame(time) {
       const ctx = this.ctx;
-      if (ASSETS.reelFrame) ctx.drawImage(ASSETS.reelFrame, 0, 442, W, 798);
+      if (ASSETS.reelFrame) ctx.drawImage(ASSETS.reelFrame, REEL_FRAME.x, REEL_FRAME.y, REEL_FRAME.w, REEL_FRAME.h);
       else REEL_LAYOUT.forEach((reel) => this.roundRect(reel.x, reel.y, reel.w, reel.h, 14, '#17195d', '#f5b95e', 6));
     }
 
@@ -1290,6 +1440,8 @@
         ctx.beginPath();
         ctx.rect(reel.x + 3, reel.y + 3, reel.w - 6, reel.h - 6);
         ctx.clip();
+        ctx.fillStyle = '#09083a38';
+        ctx.fillRect(reel.x + 3, reel.y + 3, reel.w - 6, reel.h - 6);
 
         let bounce = 0;
         if (reel.stopped && reel.bounceStart) {
@@ -1307,7 +1459,12 @@
         } else {
           const base = Math.floor((time - this.spinStart) / 95 + reel.index * 4);
           for (let row = -1; row <= reel.rows; row += 1) {
-            const symbol = { type: reel.strip[(base + row + reel.strip.length) % reel.strip.length], prize: this.randomPrize() };
+            const prize = this.randomPrize();
+            const symbol = {
+              type: reel.strip[(base + row + reel.strip.length) % reel.strip.length],
+              prize,
+              prizeAmount: prize * this.spinBet,
+            };
             const y = reel.y + row * reel.cellH + reel.offset - reel.cellH;
             this.drawSymbol(symbol, reel, row, y, 0.84, true);
           }
@@ -1332,7 +1489,12 @@
       ctx.translate(cx, cy + bob);
       ctx.rotate(tilt);
       ctx.scale(Math.max(0.02, flip) * breathe * emphasis, breathe * emphasis);
-      if (symbol.type === 'prize') this.drawPrize(0, 0, symbol.prize || 0.5, w, h);
+      if (symbol.type === 'prize') {
+        const amount = Number.isFinite(symbol.prizeAmount)
+          ? symbol.prizeAmount
+          : (symbol.prize || 0.5) * this.spinBet;
+        this.drawPrize(0, 0, amount, w, h);
+      }
       else this.drawAssetSymbol(symbol.type, 0, 0, w * 0.96, h * 0.94, reel.index);
       ctx.strokeStyle = '#f4be6822';
       ctx.lineWidth = 2;
@@ -1709,7 +1871,7 @@
 
     drawPrize(cx, cy, value, maxW = 170, maxH = 190, options = {}) {
       const ctx = this.ctx;
-      const high = value >= 100;
+      const high = options.showMultiplier ? value >= 100 : value >= Math.max(50, this.spinBet * 25);
       const pulse = high ? 1 + Math.sin(this.renderTime * 0.009) * 0.035 : 1;
       ctx.save();
       ctx.translate(cx, cy);
@@ -1733,17 +1895,22 @@
       ctx.textBaseline = 'middle';
       const text = options.showMultiplier
         ? `${value}×`.replace('.', ',')
-        : money(value * this.bet).replace('R$', 'R$ ');
-      let fontSize = Math.min(34, maxH * 0.205);
+        : Number(value).toFixed(2).replace('.', ',');
+      let fontSize = Math.min(38, maxH * 0.225);
       do {
-        ctx.font = `900 ${fontSize}px Georgia, serif`;
+        ctx.font = `900 ${fontSize}px Arial Black, Arial, sans-serif`;
         fontSize -= 1;
-      } while (fontSize > 18 && ctx.measureText(text).width > maxW * 0.67);
-      ctx.lineWidth = Math.max(4, fontSize * 0.18);
-      ctx.strokeStyle = '#661530';
-      ctx.strokeText(text, 0, maxH * 0.035);
+      } while (fontSize > 18 && ctx.measureText(text).width > maxW * 0.69);
+      ctx.lineWidth = Math.max(5, fontSize * 0.2);
+      ctx.strokeStyle = '#54132d';
+      ctx.shadowColor = '#6e2d08';
+      ctx.shadowBlur = 3;
+      ctx.shadowOffsetY = 3;
+      const valueY = 0;
+      ctx.strokeText(text, 0, valueY);
       ctx.fillStyle = value >= 100 ? '#fff07c' : '#fff7d5';
-      ctx.fillText(text, 0, maxH * 0.035);
+      ctx.fillText(text, 0, valueY);
+      ctx.shadowOffsetY = 0;
       if (high) this.drawSymbolSparkle(maxW * 0.28, -maxH * 0.28, 9, 0.8);
       ctx.restore();
     }
@@ -1751,7 +1918,7 @@
     getPaylineRailPoint(lineNumber, side) {
       const railIndex = LINE_RAILS[side].indexOf(lineNumber);
       return {
-        x: side === 'left' ? 40 : 740,
+        x: side === 'left' ? 22 : 758,
         y: LINE_RAIL_Y[railIndex],
       };
     }
@@ -1801,22 +1968,29 @@
 
     drawWinLayer(time) {
       if (this.state !== 'WIN') return;
+      const timing = this.getWinTiming();
+      const elapsed = time - this.winStart;
+      if (elapsed < timing.settleDuration) return;
       const ctx = this.ctx;
       const pulse = 0.55 + 0.45 * Math.sin((time - this.winStart) * 0.014);
-      const activeLines = this.result.lines.length
-        ? (this.lineShowAll ? this.result.lines : [this.result.lines[this.lineCycle]])
+      const steps = this.getWinSteps();
+      const activeSteps = steps.length
+        ? (this.lineShowAll ? steps : [steps[this.lineCycle]].filter(Boolean))
         : [];
-      const activeCells = activeLines.length
-        ? [...new Map(activeLines.flatMap((line) => line.cells).map((cell) => [`${cell.c}-${cell.r}`, cell])).values()]
+      const activeLines = activeSteps.filter((step) => step.kind === 'line');
+      const activeCells = activeSteps.length
+        ? [...new Map(activeSteps.flatMap((step) => step.cells).map((cell) => [`${cell.c}-${cell.r}`, cell])).values()]
         : this.result.cells;
       const activeKeys = new Set(activeCells.map(({ c, r }) => `${c}-${r}`));
+
+      this.drawWinAtmosphere(time);
 
       REEL_LAYOUT.forEach((reel, c) => {
         for (let r = 0; r < reel.rows; r += 1) {
           if (activeKeys.has(`${c}-${r}`)) continue;
           ctx.save();
-          ctx.fillStyle = '#100a2fac';
-          this.roundRect(reel.x + 5, reel.y + r * reel.cellH + 4, reel.w - 10, reel.cellH - 8, 12, '#100a2fac');
+          ctx.fillStyle = '#100a2f94';
+          this.roundRect(reel.x + 5, reel.y + r * reel.cellH + 4, reel.w - 10, reel.cellH - 8, 12, '#100a2f94');
           ctx.restore();
         }
       });
@@ -1825,7 +1999,7 @@
         const reel = REEL_LAYOUT[c];
         const x = reel.x + 5;
         const y = reel.y + r * reel.cellH + 3;
-        const emphasis = 1.055 + pulse * 0.035;
+        const emphasis = 1.04 + pulse * 0.035;
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
         const aura = ctx.createRadialGradient(x + reel.w / 2, y + reel.cellH / 2, 10, x + reel.w / 2, y + reel.cellH / 2, reel.w * 0.72);
@@ -1852,6 +2026,13 @@
 
       if (activeLines.length) {
         ctx.save();
+        if (!this.lineShowAll) {
+          const local = elapsed - timing.settleDuration - this.lineCycle * timing.stepDuration;
+          const reveal = clamp(local / Math.min(360, timing.stepDuration * 0.55), 0, 1);
+          ctx.beginPath();
+          ctx.rect(0, 360, W * reveal, 850);
+          ctx.clip();
+        }
         ctx.strokeStyle = '#ffef67';
         ctx.lineWidth = this.lineShowAll ? 6 : 8;
         ctx.globalAlpha = this.lineShowAll ? 0.88 : 1;
@@ -1863,8 +2044,35 @@
         });
         ctx.restore();
       }
-      if (!this.lineShowAll && activeLines.length === 1) this.drawLinePayout(activeLines[0], time);
+      if (!this.lineShowAll && activeSteps.length === 1) this.drawStepPayout(activeSteps[0], time);
       this.drawWinCategory(time);
+    }
+
+    drawWinAtmosphere(time) {
+      const ctx = this.ctx;
+      const intensity = { small: 0, medium: 0.04, big: 0.16, mega: 0.22, max: 0.29 }[this.winTier] || 0;
+      if (intensity <= 0) return;
+      ctx.save();
+      ctx.fillStyle = `rgba(10,5,34,${intensity})`;
+      ctx.fillRect(0, 170, W, 1040);
+      const pulse = 0.72 + Math.sin(time * 0.0045) * 0.28;
+      const halo = ctx.createRadialGradient(390, 770, 80, 390, 770, this.winTier === 'max' ? 590 : 470);
+      halo.addColorStop(0, `rgba(255,214,70,${(0.12 + intensity * 0.45) * pulse})`);
+      halo.addColorStop(0.48, `rgba(174,61,180,${intensity * 0.42})`);
+      halo.addColorStop(1, 'rgba(31,8,69,0)');
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 230, W, 1040);
+      if (this.winTier === 'mega' || this.winTier === 'max') {
+        ctx.strokeStyle = this.winTier === 'max' ? '#fff09a' : '#e890ff';
+        ctx.lineWidth = 5;
+        ctx.shadowColor = '#ffcf48';
+        ctx.shadowBlur = 18 + pulse * 18;
+        const progress = ((time - this.winStart) * 0.00038) % 1;
+        ctx.globalAlpha = 0.35 + progress * 0.45;
+        this.roundRect(REEL_FRAME.x + 14, REEL_FRAME.y + 8, REEL_FRAME.w - 28, REEL_FRAME.h - 16, 38, null, ctx.strokeStyle, 5);
+      }
+      ctx.restore();
     }
 
     drawWinnerSparkles(c, r, time) {
@@ -1878,10 +2086,10 @@
       });
     }
 
-    drawLinePayout(line, time) {
+    drawStepPayout(step, time) {
       const ctx = this.ctx;
       const timing = this.getWinTiming();
-      const local = Math.max(0, time - this.winStart - timing.allDuration - this.lineCycle * timing.lineDuration);
+      const local = Math.max(0, time - this.winStart - timing.settleDuration - this.lineCycle * timing.stepDuration);
       const cycle = local % 760;
       const alpha = cycle < 130
         ? cycle / 130
@@ -1891,11 +2099,12 @@
             ? (680 - cycle) / 200
             : 0;
       if (alpha <= 0.02) return;
-      const centerCell = line.cells.find((cell) => cell.c === 1) || line.cells[1];
-      const reel = REEL_LAYOUT[1];
+      const centerCell = step.cells.find((cell) => cell.c === 1) || step.cells[Math.floor(step.cells.length / 2)];
+      const reel = REEL_LAYOUT[centerCell.c];
       const x = reel.x + reel.w / 2;
       const y = reel.y + centerCell.r * reel.cellH + reel.cellH / 2 + 24;
-      const text = line.amount.toFixed(2).replace('.', ',');
+      const scaleToCap = timing.rawStepTotal > this.result.total ? this.result.total / timing.rawStepTotal : 1;
+      const text = (step.amount * scaleToCap).toFixed(2).replace('.', ',');
       const scale = 0.96 + alpha * 0.06;
 
       ctx.save();
@@ -1922,29 +2131,37 @@
     }
 
     drawWinCategory(time) {
-      if (!this.lastWin || !this.bet) return;
-      const ratio = this.lastWin / this.bet;
+      if (!this.lastWin || !this.spinBet) return;
       const elapsed = time - this.winStart;
-      const category = ratio >= 5000
-        ? { label: 'GANHO MÁXIMO 5000×', color: '#fff37a' }
-        : ratio >= 500
-          ? { label: 'MEGA GANHO', color: '#ff85d5' }
-          : ratio >= 100
-            ? { label: 'GRANDE GANHO', color: '#ffd45f' }
-            : ratio >= 20
-              ? { label: 'BOM GANHO', color: '#ffe88a' }
-              : ratio >= 5
-                ? { label: 'GANHO MÉDIO', color: '#fff0a3' }
-                : { label: 'GANHO', color: '#fff5c4' };
-      if ((!this.lineShowAll && ratio < 20) || elapsed < 250 || elapsed > Math.min(2300, this.getWinTiming().totalDuration - 300)) return;
-      const appear = clamp(elapsed / 500, 0, 1) * clamp((2400 - elapsed) / 420, 0, 1);
-      const pulse = 1 + Math.sin(time * 0.009) * 0.035;
+      const timing = this.getWinTiming();
+      // A vitória máxima já possui uma celebração de tela inteira. Evita repetir
+      // o mesmo título no banner intermediário enquanto o overlay está visível.
+      if (this.winTier === 'max' && elapsed >= timing.stepEnd) return;
+      const category = {
+        small: { label: 'GANHO', color: '#fff5c4', width: 300, font: 30 },
+        medium: { label: 'ÓTIMO GANHO', color: '#fff0a3', width: 390, font: 34 },
+        big: { label: 'GRANDE GANHO', color: '#ffd45f', width: 500, font: 42 },
+        mega: { label: 'MEGA GANHO', color: '#ff85d5', width: 540, font: 44 },
+        max: { label: 'VITÓRIA MÁXIMA', color: '#fff37a', width: 620, font: 46 },
+      }[this.winTier || 'small'];
+      if (!this.lineShowAll || elapsed < timing.stepEnd) return;
+      const finalElapsed = elapsed - timing.stepEnd;
+      const appear = clamp(finalElapsed / 380, 0, 1) * clamp((timing.totalDuration - elapsed) / 320, 0, 1);
+      const pulse = 1 + Math.sin(time * 0.009) * (this.winTier === 'max' ? 0.065 : 0.035);
       const ctx = this.ctx;
       ctx.save();
       ctx.globalAlpha = appear;
-      ctx.translate(390, 1230);
+      if (this.winTier === 'max') {
+        const veil = ctx.createRadialGradient(390, 760, 60, 390, 760, 650);
+        veil.addColorStop(0, 'rgba(255,192,42,0.34)');
+        veil.addColorStop(0.45, 'rgba(126,28,121,0.32)');
+        veil.addColorStop(1, 'rgba(19,7,52,0.12)');
+        ctx.fillStyle = veil;
+        ctx.fillRect(0, 180, W, 1040);
+      }
+      ctx.translate(390, 1145);
       ctx.scale(pulse, pulse);
-      if (ratio >= 100 && ASSETS.symbolIngot) {
+      if ((this.winTier === 'big' || this.winTier === 'mega' || this.winTier === 'max') && ASSETS.symbolIngot) {
         ctx.save();
         ctx.globalAlpha = 0.8;
         ctx.rotate(-0.12);
@@ -1954,32 +2171,103 @@
         this.drawImageContain(ASSETS.symbolIngot, -210, -62, 110, 80);
         ctx.restore();
       }
-      this.roundRect(-205, -43, 410, 86, 28, '#401452e8', '#ffd75e', 6);
+      const bannerWidth = category.width;
+      this.roundRect(-bannerWidth / 2, -48, bannerWidth, 96, 30, this.winTier === 'max' ? '#7e1749f2' : '#401452e8', '#ffd75e', this.winTier === 'max' ? 8 : 6);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = ratio >= 5000 ? '900 30px Georgia, serif' : '900 34px Georgia, serif';
+      ctx.font = `900 ${category.font}px Georgia, serif`;
       ctx.lineWidth = 9;
       ctx.strokeStyle = '#7d2036';
       ctx.shadowColor = category.color;
-      ctx.shadowBlur = ratio >= 500 ? 32 : 18;
+      ctx.shadowBlur = this.winTier === 'max' ? 42 : this.winTier === 'mega' ? 36 : this.winTier === 'big' ? 30 : 18;
       ctx.strokeText(category.label, 0, 0);
       ctx.fillStyle = category.color;
       ctx.fillText(category.label, 0, 0);
       ctx.restore();
     }
 
+    drawMaxWinOverlay(time) {
+      if (this.state !== 'WIN' || this.winTier !== 'max') return;
+      const timing = this.getWinTiming();
+      const elapsed = time - this.winStart;
+      if (elapsed < timing.stepEnd) return;
+      const local = elapsed - timing.stepEnd;
+      const appear = clamp(local / 520, 0, 1);
+      const accounting = this.getWinAccounting(time);
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.globalAlpha = appear;
+      const veil = ctx.createRadialGradient(390, 720, 80, 390, 720, 850);
+      veil.addColorStop(0, 'rgba(117,24,101,0.56)');
+      veil.addColorStop(0.42, 'rgba(35,11,79,0.72)');
+      veil.addColorStop(1, 'rgba(8,4,28,0.88)');
+      ctx.fillStyle = veil;
+      ctx.fillRect(0, 120, W, H - 120);
+
+      ctx.save();
+      ctx.translate(390, 640);
+      ctx.rotate(local * 0.00018);
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = '#ffe77a';
+      ctx.globalAlpha = appear * 0.24;
+      for (let ray = 0; ray < 24; ray += 1) {
+        ctx.rotate(TAU / 24);
+        ctx.beginPath();
+        ctx.moveTo(55, -5);
+        ctx.lineTo(520, -13);
+        ctx.lineTo(520, 13);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      const frame = [ASSETS.celebration3, ASSETS.celebration4, ASSETS.celebration5]
+        [Math.floor(local / 230) % 3] || this.getIdleMascotFrame(time);
+      ctx.shadowColor = '#ffd94e';
+      ctx.shadowBlur = 38;
+      this.drawImageContain(frame, 390, 640 - Math.sin(local * 0.006) * 12, 360, 390);
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '900 58px Georgia, serif';
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = '#63163f';
+      ctx.fillStyle = '#fff18a';
+      ctx.shadowColor = '#ffd132';
+      ctx.shadowBlur = 30;
+      ctx.strokeText('VITÓRIA MÁXIMA', 390, 870);
+      ctx.fillText('VITÓRIA MÁXIMA', 390, 870);
+      ctx.font = '900 68px Arial Black, Arial';
+      ctx.strokeText(money(accounting.counted), 390, 955);
+      ctx.fillText(money(accounting.counted), 390, 955);
+      if (accounting.transferProgress >= 1) {
+        const pulse = 0.72 + Math.sin(time * 0.007) * 0.28;
+        ctx.globalAlpha = appear * pulse;
+        ctx.font = '900 22px Arial Black, Arial';
+        ctx.fillStyle = '#fff7cf';
+        ctx.shadowBlur = 12;
+        ctx.fillText('TOQUE PARA CONTINUAR', 390, 1050);
+        this.hit(0, 120, W, H - 120, () => this.advanceAfterResult(performance.now()), 'continue-max-win');
+      }
+      ctx.restore();
+    }
+
     drawLineRails(time) {
       const ctx = this.ctx;
       const idleSelection = this.state === 'IDLE';
+      const steps = this.state === 'WIN' ? this.getWinSteps() : [];
+      const currentStep = steps[this.lineCycle];
       const winningLines = idleSelection
-        ? new Set(Array.from({ length: this.level }, (_, index) => index + 1))
+        ? new Set(PAYLINES.map((_, index) => index + 1))
         : (this.state === 'WIN' && this.result.lines.length
-          ? new Set((this.lineShowAll ? this.result.lines : [this.result.lines[this.lineCycle]]).map((line) => line.index + 1))
+          ? new Set((this.lineShowAll
+            ? this.result.lines
+            : (currentStep?.kind === 'line' ? [currentStep] : [])).map((line) => line.index + 1))
           : new Set());
       const pulse = idleSelection ? 1 : 0.78 + Math.sin(time * 0.018) * 0.22;
 
       Object.entries(LINE_RAILS).forEach(([side, order]) => {
-        const x = side === 'left' ? 40 : 740;
+        const x = side === 'left' ? 22 : 758;
         order.forEach((number, index) => {
           const active = winningLines.has(number);
           if (!active) return;
@@ -2001,31 +2289,47 @@
     }
 
     getWinPanelPalette() {
-      const ratio = this.bet ? this.lastWin / this.bet : 0;
-      if (ratio >= 100) return ['#4f0639', '#db1f62', '#ff8f2d'];
-      if (ratio >= 20) return ['#5b1532', '#d34824', '#ffbf35'];
-      if (ratio >= 5) return ['#24134f', '#7b2d84', '#eebf35'];
-      if (ratio >= 1) return ['#102a62', '#176a9d', '#45d7d0'];
+      const ratio = this.spinBet ? this.lastWin / this.spinBet : 0;
+      if (ratio >= WIN_TIER_CONFIG.max.minRatio) return ['#52042e', '#db1762', '#ff9b24'];
+      if (ratio >= WIN_TIER_CONFIG.mega.minRatio) return ['#39105f', '#9b258c', '#f15ead'];
+      if (ratio >= WIN_TIER_CONFIG.big.minRatio) return ['#5b1532', '#d34824', '#ffbf35'];
+      if (ratio >= WIN_TIER_CONFIG.medium.minRatio) return ['#24134f', '#7b2d84', '#eebf35'];
       return ['#25134d', '#592875', '#b14888'];
+    }
+
+    getWinBannerText(accounting) {
+      const phase = this.getWinLinePhase(this.renderTime);
+      const amount = money(accounting.counted);
+      if (phase.settling) return `GANHO ${amount}`;
+      if (!phase.showAll) {
+        const step = this.getWinSteps()[phase.index];
+        const prefix = step?.kind === 'line' ? `LINHA ${step.index + 1}` : `PRÊMIO ${step?.index || 1}`;
+        return `${prefix} • ${amount}`;
+      }
+      if (this.winTier === 'max') return `GANHO TOTAL • ${money(this.result.total)}`;
+      return `${WIN_TIER_CONFIG[this.winTier]?.label || 'GANHO TOTAL'} • ${money(this.result.total)}`;
     }
 
     drawTicker() {
       const ctx = this.ctx;
       const x = PANEL_X;
-      const y = 1235;
+      const y = DISPLAY_Y;
       const w = PANEL_W;
       const h = 164;
-      const isWin = /^WIN\s/.test(this.tickerText);
-      const winElapsed = this.renderTime - this.tickerStarted;
+      const inner = { x: x + 50, y: y + 47, w: w - 100, h: 84 };
+      const isWin = this.state === 'WIN' && this.lastWin > 0;
+      const winElapsed = isWin ? this.renderTime - this.winStart : this.renderTime - this.tickerStarted;
       const accounting = isWin ? this.getWinAccounting(this.renderTime) : null;
-      const displayText = isWin ? `WIN ${accounting.counted.toFixed(2).replace('.', ',')}` : this.tickerText;
+      const displayText = isWin ? this.getWinBannerText(accounting) : this.tickerText;
+      const centerDisplay = isWin || this.tickerMode === 'center';
       ctx.save();
-      if (ASSETS.displayFrame) ctx.drawImage(ASSETS.displayFrame, x, y, w, h);
-      else this.roundRect(x, y, w, h, 18, '#30205d', '#f7b952', 4);
+      if (!ASSETS.displayFrame) this.roundRect(x, y, w, h, 18, '#251760', '#f7b952', 4);
 
       ctx.beginPath();
-      ctx.rect(x + 45, y + 11, w - 90, h - 22);
+      ctx.rect(inner.x, inner.y, inner.w, inner.h);
       ctx.clip();
+      ctx.fillStyle = '#251760';
+      ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
       if (isWin) {
         const palette = this.getWinPanelPalette();
         const panelFill = ctx.createLinearGradient(x + 24, y, x + w - 24, y + h);
@@ -2034,7 +2338,7 @@
         panelFill.addColorStop(1, palette[2]);
         ctx.globalAlpha = 0.9;
         ctx.fillStyle = panelFill;
-        ctx.fillRect(x + 20, y + 8, w - 40, h - 16);
+        ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
         ctx.globalAlpha = 1;
         const burst = clamp(winElapsed / 260, 0, 1) * clamp((this.tickerDuration - winElapsed) / 500, 0, 1);
         const panelGlow = ctx.createRadialGradient(x + w / 2, y + h / 2, 2, x + w / 2, y + h / 2, w * 0.48);
@@ -2043,7 +2347,7 @@
         panelGlow.addColorStop(0.72, `${palette[1]}77`);
         panelGlow.addColorStop(1, 'rgba(40,8,74,0)');
         ctx.fillStyle = panelGlow;
-        ctx.fillRect(x + 20, y + 8, w - 40, h - 16);
+        ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
         ctx.save();
         ctx.translate(x + w / 2, y + h / 2);
         ctx.rotate(winElapsed * 0.00035);
@@ -2061,14 +2365,15 @@
         ctx.restore();
       }
       ctx.globalAlpha = this.tickerAlpha;
-      ctx.textAlign = this.tickerMode === 'center' ? 'center' : 'left';
+      ctx.textAlign = centerDisplay ? 'center' : 'left';
       ctx.textBaseline = 'middle';
-      const fittedSize = this.tickerMode === 'center' && this.tickerWidth > w - 70
-        ? Math.max(19, 34 * (w - 70) / this.tickerWidth)
+      const estimatedWidth = displayText.length * (isWin ? 25 : 19);
+      const fittedSize = centerDisplay && estimatedWidth > w - 70
+        ? Math.max(19, (isWin ? 43 : 34) * (w - 70) / estimatedWidth)
         : (isWin ? 43 : 34);
       const textScale = isWin ? 0.72 + easeOutBack(clamp(winElapsed / 360, 0, 1)) * 0.28 : 1;
-      const textX = this.tickerMode === 'center' ? x + w / 2 : this.tickerX;
-      ctx.translate(textX, y + h / 2 + 1);
+      const textX = centerDisplay ? x + w / 2 : this.tickerX;
+      ctx.translate(textX, y + h / 2 + (isWin ? 7 : 12));
       ctx.scale(textScale, textScale);
       ctx.font = `900 ${fittedSize}px Arial Black, Georgia, serif`;
       ctx.lineWidth = isWin ? 8 : 5;
@@ -2084,59 +2389,153 @@
       ctx.fillText(displayText, 0, 0);
       ctx.restore();
 
-      // Redraw the left and right display borders on top of the text and rays
-      if (ASSETS.displayFrame) {
-        ctx.save();
+      // Moldura transparente sempre por cima; conteúdo nunca invade o arabesco.
+      if (ASSETS.displayFrame) ctx.drawImage(ASSETS.displayFrame, x, y, w, h);
+    }
+
+    drawWalletIcon(x, y) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = '#ffd65c';
+      ctx.fillStyle = '#7b3a82';
+      ctx.lineWidth = 4;
+      this.roundRect(-21, -14, 42, 29, 7, '#7b3a82', '#ffd65c', 4);
+      this.roundRect(5, -5, 22, 14, 6, '#4c266f', '#ffd65c', 3);
+      ctx.fillStyle = '#fff4a8';
+      ctx.beginPath();
+      ctx.arc(12, 2, 2.5, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    drawCoinStackIcon(x, y) {
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.translate(x, y);
+      for (let index = 0; index < 3; index += 1) {
+        const offsetY = 11 - index * 10;
+        ctx.fillStyle = index === 2 ? '#ffe56b' : '#f3a72d';
+        ctx.strokeStyle = '#9f4e13';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.rect(x, y, 60, h);
-        ctx.rect(x + w - 60, y, 60, h);
-        ctx.clip();
-        ctx.drawImage(ASSETS.displayFrame, x, y, w, h);
-        ctx.restore();
+        ctx.ellipse(0, offsetY, 18, 7, 0, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
       }
+      ctx.restore();
     }
 
     drawStatus() {
       const ctx = this.ctx;
       ctx.save();
       ctx.textAlign = 'center';
-      if (ASSETS.scoreFrame) ctx.drawImage(ASSETS.scoreFrame, 64, 1360, 652, 103);
-      else this.roundRect(64, 1360, 652, 103, 24, '#2d205e', '#f3b862', 5);
-      const accounting = this.getWinAccounting(this.renderTime);
-      const stats = [
-        { x: 227, value: money(accounting.balance) },
-        { x: 553, value: money(this.bet) },
-      ];
-      stats.forEach((stat) => {
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#fff8eb';
-        ctx.font = '700 27px Arial';
-        ctx.fillText(stat.value, stat.x, 1427);
+      const panelGradient = ctx.createLinearGradient(64, 1360, 716, 1463);
+      panelGradient.addColorStop(0, '#2b1766');
+      panelGradient.addColorStop(0.52, '#392177');
+      panelGradient.addColorStop(1, '#211453');
+      this.roundRect(64, 1360, 652, 103, 24, panelGradient, '#f3b862', 5);
+      ctx.strokeStyle = '#d89c45';
+      ctx.lineWidth = 3;
+      [281, 499].forEach((divider) => {
+        ctx.beginPath();
+        ctx.moveTo(divider, 1368);
+        ctx.lineTo(divider, 1455);
+        ctx.stroke();
       });
-      this.hit(390, 1360, 326, 103, () => this.state === 'IDLE' && this.openOverlay('bet'));
+      const accounting = this.getWinAccounting(this.renderTime);
+      ctx.textBaseline = 'middle';
+      ctx.font = '800 14px Arial, sans-serif';
+      ctx.fillStyle = '#e8dba9';
+      ctx.fillText('SALDO', 173, 1384);
+      ctx.fillText('GANHO TOTAL', 390, 1384);
+      ctx.fillText(`APOSTA • NÍVEL ${this.level}`, 607, 1384);
+
+      const pulseAge = this.balancePulseStart ? this.renderTime - this.balancePulseStart : Infinity;
+      const balancePulse = pulseAge < 620 ? 1 + Math.sin(clamp(pulseAge / 620, 0, 1) * Math.PI) * 0.08 : 1;
+      ctx.save();
+      ctx.translate(173, 1425);
+      ctx.scale(balancePulse, balancePulse);
+      ctx.fillStyle = '#fff9e5';
+      ctx.font = '900 25px Arial Black, Arial';
+      ctx.fillText(money(accounting.balance), 0, 0);
+      ctx.restore();
+
+      const currentGain = this.state === 'WIN' ? accounting.gain : 0;
+      const gainPulse = currentGain > 0 ? 1 + Math.sin(this.renderTime * 0.012) * 0.025 : 1;
+      ctx.save();
+      ctx.translate(390, 1425);
+      ctx.scale(gainPulse, gainPulse);
+      ctx.fillStyle = currentGain > 0 ? '#ffe266' : '#d8d3dc';
+      ctx.shadowColor = currentGain > 0 ? '#ffc536' : 'transparent';
+      ctx.shadowBlur = currentGain > 0 ? 12 : 0;
+      ctx.font = '900 26px Arial Black, Arial';
+      ctx.fillText(money(currentGain), 0, 0);
+      ctx.restore();
+
+      ctx.fillStyle = '#fff9e5';
+      ctx.font = '900 25px Arial Black, Arial';
+      ctx.fillText(money(this.bet), 607, 1425);
+      this.hit(499, 1360, 217, 103, () => this.state === 'IDLE' && this.openOverlay('bet'));
+      ctx.restore();
+    }
+
+    drawActiveControlState(control, time) {
+      const ctx = this.ctx;
+      const pulse = 0.72 + Math.sin(time * 0.009) * 0.28;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      const glow = ctx.createRadialGradient(0, 0, control.r * 0.48, 0, 0, control.r * 1.18);
+      glow.addColorStop(0, control.id === 'turbo' ? 'rgba(255,205,55,0.34)' : 'rgba(80,224,255,0.30)');
+      glow.addColorStop(0.68, control.id === 'turbo' ? `rgba(255,174,34,${0.18 + pulse * 0.12})` : `rgba(65,210,255,${0.16 + pulse * 0.12})`);
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, control.r * 1.22, 0, TAU);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = control.id === 'turbo' ? '#fff0a0' : '#baf7ff';
+      ctx.lineWidth = 4;
+      ctx.shadowColor = control.id === 'turbo' ? '#ffc52d' : '#4bdfff';
+      ctx.shadowBlur = 14 + pulse * 8;
+      ctx.beginPath();
+      ctx.arc(0, 0, control.r * 0.94, 0, TAU);
+      ctx.stroke();
+      if (control.id === 'turbo') {
+        ctx.fillStyle = '#fff8d6';
+        ctx.strokeStyle = '#ef9b1e';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(5, -34);
+        ctx.lineTo(-15, -3);
+        ctx.lineTo(-2, -3);
+        ctx.lineTo(-12, 31);
+        ctx.lineTo(18, -9);
+        ctx.lineTo(4, -9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
     drawControls(time) {
       const ctx = this.ctx;
       const autoWasActive = this.autoActive;
+      const betControlsDisabled = this.state !== 'IDLE';
       const controls = [
-        { id: 'turbo', x: 81, y: 1585, r: 58, image: ASSETS.turboButton, active: this.turbo, action: () => {
+        { id: 'turbo', x: 78, y: 1585, r: 64, image: ASSETS.turboButton, active: this.turbo, action: () => {
           this.turbo = !this.turbo;
-          this.message = this.turbo ? 'TURBO ATIVADO' : 'TURBO DESATIVADO';
+          this.message = this.turbo ? 'RODADA TURBO ATIVADA' : 'RODADA TURBO DESATIVADA';
           this.enqueuePanel(this.message, 'center', 2600);
         } },
-        { id: 'minus', x: 194, y: 1585, r: 46, image: ASSETS.minusButton, action: () => {
-          if (this.state !== 'IDLE') return;
-          this.level = clamp(this.level - 1, 1, 10);
-          this.showPaylinePreview();
+        { id: 'minus', x: 194, y: 1585, r: 51, image: ASSETS.minusButton, disabled: betControlsDisabled, action: () => {
+          this.adjustBetLevel(-1);
         } },
-        { id: 'plus', x: 582, y: 1585, r: 46, image: ASSETS.plusButton, action: () => {
-          if (this.state !== 'IDLE') return;
-          this.level = clamp(this.level + 1, 1, 10);
-          this.showPaylinePreview();
+        { id: 'plus', x: 582, y: 1585, r: 51, image: ASSETS.plusButton, disabled: betControlsDisabled, action: () => {
+          this.adjustBetLevel(1);
         } },
-        { id: 'auto', x: 694, y: 1585, r: 55, image: ASSETS.autoButton, active: this.autoActive, action: () => {
+        { id: 'auto', x: 699, y: 1585, r: 61, image: ASSETS.autoButton, active: this.autoActive, action: () => {
           if (autoWasActive) return;
           if (this.state === 'IDLE') this.openOverlay('auto');
         } },
@@ -2148,23 +2547,14 @@
         ctx.save();
         ctx.translate(control.x, control.y);
         ctx.scale(pressed, pressed);
+        ctx.globalAlpha = control.disabled ? 0.43 : 1;
         this.drawImageContain(control.image, 0, 0, control.r * 2, control.r * 2);
-        if (control.active) {
-          const activePulse = 0.75 + Math.sin(time * 0.008) * 0.25;
-          ctx.strokeStyle = '#fff078';
-          ctx.lineWidth = 5;
-          ctx.shadowColor = '#ffd84f';
-          ctx.shadowBlur = 16 + activePulse * 8;
-          ctx.beginPath();
-          ctx.arc(0, 0, control.r * 0.79, 0, TAU);
-          ctx.stroke();
-          ctx.fillStyle = '#fff3a2';
-          ctx.beginPath();
-          ctx.arc(control.r * 0.57, -control.r * 0.57, 6, 0, TAU);
-          ctx.fill();
-        }
+        if (control.active) this.drawActiveControlState(control, time);
         ctx.restore();
-        this.hit(control.x - control.r, control.y - control.r, control.r * 2, control.r * 2, control.action, control.id);
+        if (!control.disabled) {
+          const hitRadius = control.r + 9;
+          this.hit(control.x - hitRadius, control.y - hitRadius, hitRadius * 2, hitRadius * 2, control.action, control.id);
+        }
       });
 
       const spinBusy = this.state === 'SPIN_LOOP';
@@ -2287,10 +2677,24 @@
       this.autoActive = true;
       this.autoTotal = count;
       this.autoStartBalance = this.balance;
+      this.autoLimits.loss = this.autoStopAmount;
       this.closeOverlay();
       this.message = `${count} RODADAS AUTOMÁTICAS`;
       this.enqueuePanel(this.message, 'center', 3000);
       if (this.state === 'IDLE') this.spin();
+    }
+
+    selectAutoCount(count) {
+      this.autoSelectedCount = count;
+    }
+
+    adjustAutoStopAmount(direction) {
+      this.autoStopAmount = clamp(
+        this.autoStopAmount + direction * AUTO_STOP_STEP,
+        AUTO_STOP_MIN,
+        AUTO_STOP_MAX,
+      );
+      this.autoLimits.loss = this.autoStopAmount;
     }
 
     drawOverlay() {
@@ -2306,6 +2710,11 @@
         auth: 'AUTENTICIDADE',
       };
       ctx.save();
+      if (this.overlay === 'auto') {
+        this.drawAutoOverlay();
+        ctx.restore();
+        return;
+      }
       ctx.fillStyle = '#161520f5';
       ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = '#302f3dfd';
@@ -2335,7 +2744,6 @@
       });
 
       if (this.overlay === 'menu') this.drawMenuOverlay();
-      if (this.overlay === 'auto') this.drawAutoOverlay();
       if (this.overlay === 'bet') this.drawBetOverlay();
       if (this.overlay === 'paytable') this.drawPaytableOverlay();
       if (this.overlay === 'rules') this.drawRulesOverlay();
@@ -2444,54 +2852,115 @@
 
     drawAutoOverlay() {
       const ctx = this.ctx;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#fff';
-      ctx.font = '500 32px Arial';
-      ctx.fillText('NÚMERO DE RODADAS', 390, 230);
-      [10, 30, 50, 80, 100].forEach((count, index) => {
-        const x = 82 + index * 154;
-        this.circleButton(x, 330, 58, '#4a4956', '#666572', `${count}`, 30);
-        this.hit(x - 64, 266, 128, 128, () => this.startAuto(count));
-      });
-      ctx.fillStyle = '#aaa9b2';
-      ctx.font = '400 24px Arial';
-      ctx.fillText('Toque num valor para começar', 390, 430);
-      ctx.strokeStyle = '#ffffff16';
-      ctx.beginPath();
-      ctx.moveTo(50, 485);
-      ctx.lineTo(730, 485);
-      ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.font = '500 32px Arial';
-      ctx.fillText('LIMITES PARA PARAR', 390, 550);
+      const time = this.renderTime;
+      const panel = { x: 10, y: 386, w: 760, h: 570 };
+      const scale = panel.w / 1448;
+      const mapX = (sourceX) => panel.x + sourceX * scale;
+      const mapY = (sourceY) => panel.y + sourceY * scale;
+      ctx.fillStyle = '#050315d1';
+      ctx.fillRect(0, 0, W, H);
+      ctx.save();
+      ctx.shadowColor = '#18022f';
+      ctx.shadowBlur = 34;
+      if (ASSETS.autoPanel) ctx.drawImage(ASSETS.autoPanel, panel.x, panel.y, panel.w, panel.h);
+      else this.roundRect(panel.x, panel.y, panel.w, panel.h, 26, '#12113a', '#ffbe43', 6);
+      ctx.restore();
 
-      const rows = [
-        { key: 'loss', title: 'Se o saldo diminuir', detail: 'relativo ao saldo inicial' },
-        { key: 'gain', title: 'Se o saldo aumentar', detail: 'relativo ao saldo inicial' },
-        { key: 'single', title: 'Se um ganho exceder', detail: 'valor de um único giro' },
-      ];
-      rows.forEach((row, index) => {
-        const y = 610 + index * 180;
-        this.roundRect(55, y, 670, 145, 22, '#292835', '#ffffff14', 2);
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#fff';
-        ctx.font = '500 30px Arial';
-        ctx.fillText(row.title, 90, y + 53);
-        ctx.fillStyle = '#9f9ea8';
-        ctx.font = '400 21px Arial';
-        ctx.fillText(row.detail, 90, y + 91);
-        const value = this.autoLimits[row.key];
-        this.roundRect(545, y + 31, 145, 78, 39, value ? '#5c4439' : '#44434f', value ? '#ffae59' : '#666572', 3);
-        ctx.textAlign = 'center';
-        ctx.fillStyle = value ? '#ffb15f' : '#d4d3d9';
-        ctx.font = '700 25px Arial';
-        ctx.fillText(value ? money(value) : 'Sem limite', 617, y + 79);
-        this.hit(545, y + 25, 150, 90, () => this.editAutoLimit(row.key));
+      const counts = [10, 30, 50, 80, 100];
+      const countCenters = [345, 537, 728, 924, 1115].map(mapX);
+      const countY = mapY(454);
+      counts.forEach((count, index) => {
+        const id = `auto-${count}`;
+        const selected = this.autoSelectedCount === count;
+        if (selected || (this.buttonPress && this.buttonPress.id === id && time < this.buttonPress.until)) {
+          const pressed = this.pressScale(id, time);
+          ctx.save();
+          ctx.translate(countCenters[index], countY);
+          ctx.scale(pressed, pressed);
+          ctx.shadowColor = '#ffcc3d';
+          ctx.shadowBlur = selected ? 14 : 7;
+          this.drawImageContain(ASSETS.autoSelection, 0, 0, 104, 63);
+          ctx.fillStyle = '#ffe56a';
+          ctx.strokeStyle = '#6b2609';
+          ctx.lineWidth = 4;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.font = '900 27px Georgia, serif';
+          ctx.strokeText(String(count), 0, 2);
+          ctx.fillText(String(count), 0, 2);
+          ctx.restore();
+        }
+        this.hit(countCenters[index] - 54, countY - 36, 108, 72, () => this.selectAutoCount(count), id);
       });
+
+      ctx.save();
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#aaa9b2';
-      ctx.font = '400 22px Arial';
-      ctx.fillText('Toque num limite para informar um valor em reais.', 390, 1210);
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffe05d';
+      ctx.strokeStyle = '#54210b';
+      ctx.lineWidth = 6;
+      ctx.font = '900 38px Georgia, serif';
+      const formattedStop = `R$ ${this.autoStopAmount.toLocaleString('pt-BR')},00`;
+      ctx.strokeText(formattedStop, 390, mapY(682));
+      ctx.fillText(formattedStop, 390, mapY(682));
+      ctx.restore();
+
+      const sliderStart = mapX(395);
+      const sliderEnd = mapX(1058);
+      const sliderY = mapY(778);
+      const sliderProgress = (this.autoStopAmount - AUTO_STOP_MIN) / (AUTO_STOP_MAX - AUTO_STOP_MIN);
+      const knobX = lerp(sliderStart, sliderEnd, sliderProgress);
+      const sliderGradient = ctx.createLinearGradient(sliderStart, sliderY, sliderEnd, sliderY);
+      sliderGradient.addColorStop(0, '#ff9d16');
+      sliderGradient.addColorStop(1, '#ffe868');
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = sliderGradient;
+      ctx.lineWidth = 12;
+      ctx.shadowColor = '#ffbe24';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(sliderStart, sliderY);
+      ctx.lineTo(knobX, sliderY);
+      ctx.stroke();
+      ctx.shadowBlur = 10;
+      this.drawImageContain(ASSETS.autoSliderKnob, knobX, sliderY, 42, 42);
+      ctx.restore();
+
+      const actionButtons = [
+        { id: 'auto-minus', x: mapX(321), image: ASSETS.autoMinus, action: () => this.adjustAutoStopAmount(-1) },
+        { id: 'auto-plus', x: mapX(1137), image: ASSETS.autoPlus, action: () => this.adjustAutoStopAmount(1) },
+      ];
+      actionButtons.forEach((button) => {
+        const pressed = this.pressScale(button.id, time);
+        ctx.save();
+        ctx.translate(button.x, sliderY);
+        ctx.scale(pressed, pressed);
+        this.drawImageContain(button.image, 0, 0, 72, 68);
+        ctx.restore();
+        this.hit(button.x - 42, sliderY - 40, 84, 80, button.action, button.id);
+      });
+
+      const closeX = mapX(1177);
+      const closeY = mapY(221);
+      const closePressed = this.pressScale('auto-close', time);
+      ctx.save();
+      ctx.translate(closeX, closeY);
+      ctx.scale(closePressed, closePressed);
+      this.drawImageContain(ASSETS.autoClose, 0, 0, 74, 82);
+      ctx.restore();
+      this.hit(closeX - 43, closeY - 46, 86, 92, () => this.closeOverlay(), 'auto-close');
+
+      const startY = mapY(966);
+      const startPressed = this.pressScale('auto-start', time);
+      ctx.save();
+      ctx.translate(390, startY);
+      ctx.scale(startPressed, startPressed);
+      ctx.shadowColor = '#7dff4c';
+      ctx.shadowBlur = 12;
+      this.drawImageContain(ASSETS.autoStart, 0, 0, 315, 86);
+      ctx.restore();
+      this.hit(225, startY - 48, 330, 96, () => this.startAuto(this.autoSelectedCount), 'auto-start');
     }
 
     drawPaytableOverlay() {
@@ -2863,6 +3332,32 @@
           ctx.beginPath();
           ctx.ellipse(0, 0, particle.size * 0.36, particle.size * 0.27, 0, 0, TAU);
           ctx.stroke();
+        } else if (particle.kind === 'carrot') {
+          ctx.fillStyle = '#ff8b2c';
+          ctx.strokeStyle = '#ffe06b';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, particle.size * 0.46, particle.size, 0.4, 0, TAU);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#72d34e';
+          ctx.fillRect(-2, -particle.size * 1.25, 4, particle.size * 0.48);
+        } else if (particle.kind === 'frd') {
+          ctx.fillStyle = '#7a236f';
+          ctx.strokeStyle = '#ffd65a';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, particle.size, 0, TAU);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#fff0a1';
+          ctx.font = `900 ${Math.max(8, particle.size)}px Arial Black, Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('FRD', 0, 1);
+        } else if (particle.kind === 'confetti') {
+          ctx.fillStyle = particle.color;
+          ctx.fillRect(-particle.size * 0.3, -particle.size, particle.size * 0.6, particle.size * 2);
         } else {
           ctx.fillStyle = particle.color;
           ctx.fillRect(-particle.size / 2, -particle.size / 3, particle.size, particle.size * 0.66);

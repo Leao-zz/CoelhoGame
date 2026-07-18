@@ -31,23 +31,50 @@ assert.match(app, /drawRulesOverlay/);
 assert.match(app, /drawHistoryOverlay/);
 assert.match(app, /drawAuthOverlay/);
 assert.match(app, /drawLineRails/);
+assert.match(app, /new Set\(PAYLINES\.map\(\(_, index\) => index \+ 1\)\)/);
 assert.match(app, /lineShowAll/);
 assert.match(app, /drawTicker/);
+assert.match(app, /const inner = \{ x: x \+ 50, y: y \+ 47, w: w - 100, h: 84 \}/);
+assert.match(app, /ctx\.fillStyle = '#251760'/);
 assert.match(app, /demoMode === 'lines'/);
 assert.match(app, /demoMode === 'line1'/);
 assert.match(app, /demoMode === 'lines35'/);
 assert.match(app, /demoMode === 'prize'/);
 assert.match(app, /demoMode === 'max'/);
 assert.match(app, /demoMode === 'mixed'/);
+assert.match(app, /const demoMode = query\.get\('demo'\) \|\| ''/);
 assert.match(app, /SHOWCASE_MULTI_LINE_RATE/);
 assert.match(app, /makeMixedWinGrid/);
 assert.match(app, /getWinAccounting/);
 assert.match(app, /const minimumWin = Math\.min/);
-assert.match(app, /\* 3, 0, 1/);
+assert.match(app, /\* 2\.6, 0, 1/);
 assert.match(app, /completeBalanceTransfer/);
-assert.match(app, /launchLineTransfer/);
+assert.match(app, /launchWinTransfer/);
+assert.match(app, /`LINHA \$\{step\.index \+ 1\}`/);
 assert.match(app, /drawMoneyTransfers/);
+assert.match(app, /WIN_TIER_CONFIG/);
+assert.match(app, /minRatio: 0, maxRatio: 2/);
+assert.match(app, /minRatio: 2, maxRatio: 10/);
+assert.match(app, /minRatio: 10, maxRatio: 50/);
+assert.match(app, /minRatio: 50, maxRatio: 100/);
+assert.match(app, /minRatio: 100, maxRatio: Infinity/);
+assert.match(app, /getWinSteps/);
+assert.match(app, /settleDuration/);
+assert.match(app, /drawWinAtmosphere/);
+assert.match(app, /drawMaxWinOverlay/);
+assert.match(app, /if \(this\.winTier === 'max' && elapsed >= timing\.stepEnd\) return/);
+assert.match(app, /launchCelebrationConfetti/);
+assert.match(app, /getWinBannerText/);
+assert.match(app, /const centerDisplay = isWin \|\| this\.tickerMode === 'center'/);
+assert.match(app, /GANHO TOTAL/);
+assert.match(app, /balancePulseStart/);
 assert.match(app, /drawAutoIndicator/);
+assert.match(app, /drawAutoOverlay/);
+assert.match(app, /if \(this\.overlay === 'auto'\)/);
+assert.match(app, /AUTO_STOP_MIN = 1600/);
+assert.match(app, /AUTO_STOP_MAX = 3200/);
+assert.match(app, /adjustAutoStopAmount/);
+assert.match(app, /autoSelectedCount/);
 assert.match(app, /target\.id !== 'turbo'/);
 assert.match(app, /panelQueue/);
 assert.match(app, /drawOpeningOverlay/);
@@ -63,17 +90,38 @@ assert.match(app, /getPaylineRailPoint/);
 assert.match(app, /tracePayline\(lineNumber\)/);
 assert.match(app, /ctx\.moveTo\(left\.x, left\.y\)/);
 assert.match(app, /ctx\.lineTo\(right\.x, right\.y\)/);
+assert.match(app, /APOSTA 10 • MÁXIMA/);
+assert.match(app, /APOSTA 1 • MÍNIMA/);
+assert.match(app, /NÍVEL \$\{this\.level\}/);
+assert.match(app, /freezePrizeValues/);
+assert.match(app, /prizeAmount/);
+assert.match(app, /showPanelNow/);
+assert.match(app, /RODADA TURBO ATIVADA/);
+assert.match(app, /RODADA TURBO DESATIVADA/);
 assert.match(html, /tabindex="0"/);
 assert.ok(fs.existsSync(path.join(root, 'assets/audio/Bamboo_and_Morning_Light.mp3')));
 assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/logo.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/central_rolos.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/saldo_aposta.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/display.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/display_novo.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/balao_longo.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/wild.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/simbolo_premio.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/12_simbolo_moeda_chinesa_esquerda.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/opening/clean/fundo_abertura.jpg')));
 assert.ok(fs.existsSync(path.join(root, 'assets/opening/clean/fundo_botao.png')));
+for (const autoAsset of [
+  'tela_automatica.png',
+  'marcacao_numeros.png',
+  'botao_spin.png',
+  'menos.png',
+  'mais.png',
+  'iniciar.png',
+  'fechar.png',
+]) {
+  assert.ok(fs.existsSync(path.join(root, 'assets/automatic', autoAsset)));
+}
 for (let frame = 1; frame <= 5; frame += 1) {
   assert.ok(fs.existsSync(path.join(root, `assets/celebration/clean/animacao_ganhou${frame}.png`)));
   assert.ok(fs.existsSync(path.join(root, `assets/idle/clean/animacao_parado${frame}.png`)));

@@ -1,6 +1,6 @@
 # Checklist mestre — CoelhoGame
 
-Última atualização: 17/07/2026
+Última atualização: 18/07/2026
 
 Legenda:
 
@@ -12,6 +12,67 @@ Legenda:
 - `FAZER ALGUM DIA` fora do escopo atual; não conta como pendência do projeto.
 
 ## Concluído
+
+### Estados progressivos de vitória e painel financeiro — 18/07/2026
+
+- [x] Classificar ganhos por razão sobre a aposta: pequena `<2×`, média `2–10×`, grande `10–50×`, mega `50–100×` e máxima `≥100×`.
+- [x] Manter as faixas e intensidades configuráveis em um único mapa no código.
+- [x] Preservar o resultado completo por `90–250 ms` antes de iniciar qualquer destaque.
+- [x] Apresentar combinações vencedoras uma por vez e reunir todas somente no fechamento.
+- [x] Escurecer apenas perdedores, preservando-os visíveis, e aplicar pulso, halo e contorno dourado nos vencedores.
+- [x] Revelar cada linha progressivamente da esquerda para a direita.
+- [x] Apresentar cada placa de Prêmio como uma etapa independente antes do total.
+- [x] Iniciar a contagem pelo menor valor efetivamente ganho, sem exibir `WIN 0,00`, e acelerar a progressão em `2,6×`.
+- [x] Transferir visualmente os valores das combinações para o painel de ganho.
+- [x] Atualizar o Saldo somente depois da contagem e aplicar pulso curto na confirmação.
+- [x] Manter a Aposta estável durante toda a sequência.
+- [x] Reintroduzir painel financeiro com `SALDO`, `GANHO TOTAL` e `APOSTA`, respeitando hierarquia de título e valor.
+- [x] Diferenciar brilho, moedas, partículas, fundo e reação do mascote em cada categoria.
+- [x] Adicionar confetes de cenoura e emblema FRD para Mega e Vitória Máxima.
+- [x] Criar tela especial para Vitória Máxima, ocultando controles e exibindo ação para continuar.
+- [x] Criar estados próprios do display para giro, linha, placa de Prêmio, ganho total e cada categoria.
+- [x] Adicionar demos determinísticas `?demo=tier-small`, `tier-medium`, `tier-big`, `tier-mega` e `tier-max`.
+- [x] Atualizar testes estruturais para cobrir a nova máquina de vitória.
+
+### Leitura da aposta, proporções e sequência de vitória — 17/07/2026
+
+- [x] Exibir o nível atual da aposta de `1` a `10` junto do valor monetário.
+- [x] Mostrar feedback imediato `APOSTA N • R$ valor` ao usar Mais/Menos.
+- [x] Congelar os valores monetários dos símbolos de Prêmio no início da rodada, sem alterá-los quando a aposta muda depois do resultado.
+- [x] Aumentar a largura útil dos cilindros e reduzir os espaços laterais, preservando a composição `3 / 4 / 3`.
+- [x] Reduzir e subir o logotipo para liberar área visual para o jogo.
+- [x] Escurecer discretamente o interior dos cilindros para aumentar o contraste dos símbolos.
+- [x] Centralizar e redimensionar automaticamente o texto dos símbolos de Prêmio, sem prefixo `R$`.
+- [x] Manter uma pausa inicial, detalhar cada linha vencedora e reunir todas no fechamento.
+- [x] Aplicar categorias progressivas de ganho pequeno, médio, grande, mega e máximo.
+- [x] Manter no painel financeiro Saldo, Ganho Total e Aposta, com valores mais legíveis e indicação do nível.
+- [x] Diferenciar visualmente Turbo e Auto ativos e ampliar as áreas de toque dos controles.
+- [x] Bloquear Mais/Menos durante o giro.
+- [x] Validar a composição e a interação nos viewports móveis `430 × 932` e `360 × 800`.
+
+### Ajustes finais de tela e controles — 17/07/2026
+
+- [x] Subir a composição dos cilindros para cobrir melhor a base do mascote animado.
+- [x] Subir o display de informações e mantê-lo acima do painel de Saldo/Aposta.
+- [x] Substituir o contorno amarelo dos estados Turbo/Auto por halo externo verde discreto.
+- [x] Centralizar verticalmente o texto rolante dentro da máscara útil do display.
+- [x] Recortar o painel `WIN` na mesma máscara usada pelas mensagens comuns.
+- [x] Fixar as 10 linhas de aposta como sempre ativas e não selecionáveis.
+- [x] Fazer os botões Mais/Menos alterarem somente o valor da aposta.
+- [x] Informar `APOSTA MÁXIMA` e `APOSTA MÍNIMA` ao atingir os limites.
+- [x] Informar `RODADA TURBO ATIVADA` e `RODADA TURBO DESATIVADA`.
+- [x] Refatorar Rodada Automática com cenário oriental próprio, fundo escurecido e botão de fechar.
+- [x] Permitir selecionar 10, 30, 50, 80 ou 100 rodadas antes de iniciar.
+- [x] Implementar controle obrigatório de parada entre R$ 1.600 e R$ 3.200.
+- [x] Preencher barra do controle de parada em amarelo conforme valor aumenta.
+- [x] Usar botão `INICIAR` separado para confirmar Rodada Automática.
+- [x] Aplicar feedback de escala e brilho em todos os controles do popup automático.
+- [x] Centralizar verticalmente o valor monetário do símbolo de Prêmio.
+- [x] Subir as categorias de ganho, incluindo `BOM GANHO`, para não sobrepor o display.
+- [x] Atualizar testes estruturais para cobrir linhas fixas, máscara, popup e mensagens.
+- [x] Substituir lanternas laterais pela versão com corda maior, preservando proporção e animação.
+- [x] Centralizar valor da aposta com o título visual da arte.
+- [x] Aplicar nova moldura transparente do display e limitar animação WIN à área interna `#251760`.
 
 ### Levantamento e referências
 
@@ -105,7 +166,7 @@ Legenda:
 - [x] Integrar os elementos finais em `assets/layout-v3/` sem distorção.
 - [x] Reposicionar logo, menu, telhados, balões, nuvens e mascote conforme a referência.
 - [x] Reposicionar a moldura `3 / 4 / 3`, display, saldo/aposta e controles.
-- [x] Remover `GANHO TOTAL` do placar inferior; o ganho permanece no display animado.
+- [x] Exibir `GANHO TOTAL` no placar inferior e manter o contexto detalhado no display animado.
 - [x] Remover títulos duplicados de `SALDO` e `APOSTA` no runtime.
 - [x] Substituir os nove símbolos por PNGs uniformes de `300 × 300`.
 - [x] Substituir animações idle e de vitória pelas versões compactadas de `500 × 500`.
@@ -161,8 +222,8 @@ Legenda:
 - [x] Acender linha vencedora nos dois lados.
 - [x] Suportar várias linhas vencedoras na mesma rodada.
 - [x] Apresentar cada linha vencedora individualmente.
-- [x] Acender todas as linhas vencedoras no início do ciclo.
-- [x] Depois apresentar cada linha individual, encerrando na última linha vencedora.
+- [x] Apresentar cada linha individual no início do ciclo.
+- [x] Acender todas as linhas vencedoras juntas no fechamento do ciclo.
 - [x] Aumentar a duração de cada fase para facilitar leitura.
 - [x] Piscar o valor monetário de cada linha sobre a coluna central.
 - [x] Criar teste determinístico `?demo=lines` com 10 linhas e ganho R$6,00.
