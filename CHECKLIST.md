@@ -98,6 +98,21 @@ Legenda:
 - [x] Usar `base.png` somente como gabarito, fora do runtime.
 - [x] Recalibrar coordenadas dos símbolos, linhas e áreas de toque.
 
+### Composição responsiva v3 — pacote final 17/07/2026
+
+- [x] Preservar o novo pacote-fonte em `PSD e originais/arquivos/`.
+- [x] Medir `referencia_posicao.png` e mapear proporções para o Canvas lógico.
+- [x] Integrar os elementos finais em `assets/layout-v3/` sem distorção.
+- [x] Reposicionar logo, menu, telhados, balões, nuvens e mascote conforme a referência.
+- [x] Reposicionar a moldura `3 / 4 / 3`, display, saldo/aposta e controles.
+- [x] Remover `GANHO TOTAL` do placar inferior; o ganho permanece no display animado.
+- [x] Remover títulos duplicados de `SALDO` e `APOSTA` no runtime.
+- [x] Substituir os nove símbolos por PNGs uniformes de `300 × 300`.
+- [x] Substituir animações idle e de vitória pelas versões compactadas de `500 × 500`.
+- [x] Manter somente os quadros `animacao_ganhou1` a `animacao_ganhou5` no runtime.
+- [x] Validar enquadramento em viewport equivalente ao iPhone 15 Pro Max (`430 × 932`).
+- [x] Executar giro completo no navegador com prêmio e console sem erros.
+
 ### Cilindros e giro
 
 - [x] Implementar três cilindros.

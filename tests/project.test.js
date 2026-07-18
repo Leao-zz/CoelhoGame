@@ -12,14 +12,14 @@ assert.match(html, /canvas id="gameCanvas" width="1166" height="2434"/);
 assert.match(html, /game-core\.js/);
 assert.doesNotMatch(app, /original-site-assets|download-\d+\.png/);
 assert.match(app, /assets\/symbols-v2\/clean/);
-assert.match(app, /assets\/layout-v2\/clean/);
+assert.match(app, /assets\/layout-v3/);
 assert.match(app, /Bamboo_and_Morning_Light\.mp3/);
 assert.match(app, /musicEnabled/);
 assert.match(app, /effectsEnabled/);
 assert.match(app, /setMusicEnabled/);
 assert.match(app, /setEffectsEnabled/);
-assert.match(app, /logo_jogo\.png/);
-assert.match(app, /central_rolo_aposta\.png/);
+assert.match(app, /logo\.png/);
+assert.match(app, /central_rolos\.png/);
 assert.doesNotMatch(app, /reference\/layout-v2\/base\.png/);
 assert.match(app, /0\.136/);
 assert.match(app, /loadAssets/);
@@ -65,8 +65,10 @@ assert.match(app, /ctx\.moveTo\(left\.x, left\.y\)/);
 assert.match(app, /ctx\.lineTo\(right\.x, right\.y\)/);
 assert.match(html, /tabindex="0"/);
 assert.ok(fs.existsSync(path.join(root, 'assets/audio/Bamboo_and_Morning_Light.mp3')));
-assert.ok(fs.existsSync(path.join(root, 'assets/layout-v2/clean/logo_jogo.png')));
-assert.ok(fs.existsSync(path.join(root, 'assets/layout-v2/clean/central_rolo_aposta.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/logo.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/central_rolos.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/saldo_aposta.png')));
+assert.ok(fs.existsSync(path.join(root, 'assets/layout-v3/display.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/wild.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/simbolo_premio.png')));
 assert.ok(fs.existsSync(path.join(root, 'assets/symbols-v2/clean/12_simbolo_moeda_chinesa_esquerda.png')));
@@ -75,6 +77,23 @@ assert.ok(fs.existsSync(path.join(root, 'assets/opening/clean/fundo_botao.png'))
 for (let frame = 1; frame <= 5; frame += 1) {
   assert.ok(fs.existsSync(path.join(root, `assets/celebration/clean/animacao_ganhou${frame}.png`)));
   assert.ok(fs.existsSync(path.join(root, `assets/idle/clean/animacao_parado${frame}.png`)));
+}
+for (const symbol of [
+  '10_simbolo_saco_fortuna.png',
+  '11_simbolo_lingote.png',
+  '12_simbolo_moeda_chinesa_esquerda.png',
+  '14_simbolo_coelho_branco.png',
+  '15_simbolo_cenoura.png',
+  '17_simbolo_coelho_dourado.png',
+  '18_simbolo_lanterna_fortuna.png',
+  'simbolo_premio.png',
+  'wild.png',
+]) {
+  const file = path.join(root, 'assets/symbols-v2/clean', symbol);
+  assert.ok(fs.existsSync(file));
+  const dimensions = fs.readFileSync(file).subarray(16, 24);
+  assert.equal(dimensions.readUInt32BE(0), 300);
+  assert.equal(dimensions.readUInt32BE(4), 300);
 }
 assert.ok(fs.existsSync(path.join(root, 'server.js')));
 assert.ok(fs.existsSync(path.join(root, 'reference/layout-v2/base.png')));

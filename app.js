@@ -8,15 +8,15 @@
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const lerp = (a, b, t) => a + (b - a) * t;
   const easeOutBack = (t) => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
-  const PANEL_X = 95;
-  const PANEL_W = 590;
+  const PANEL_X = 90;
+  const PANEL_W = 600;
   const PANEL_DEFAULT_DURATION = 5200;
 
   const { PAYLINES, SYMBOLS, FEATURE_TRIGGER_RATE, evaluateGrid, makeMixedWinGrid } = window.CoelhoMath;
   const REEL_LAYOUT = [
-    { x: 69, y: 535, w: 202, h: 645, rows: 3, cellH: 215 },
-    { x: 289, y: 477, w: 202, h: 740, rows: 4, cellH: 185 },
-    { x: 509, y: 535, w: 202, h: 645, rows: 3, cellH: 215 },
+    { x: 79, y: 509, w: 198, h: 669, rows: 3, cellH: 223 },
+    { x: 290, y: 466, w: 200, h: 762, rows: 4, cellH: 190.5 },
+    { x: 503, y: 509, w: 198, h: 669, rows: 3, cellH: 223 },
   ];
   const LINE_RAILS = {
     left: [2, 3, 1, 6, 7, 4, 5, 10, 8, 9],
@@ -24,23 +24,23 @@
   };
   const LINE_RAIL_Y = [565, 620, 675, 760, 815, 870, 925, 1025, 1080, 1135];
   const ASSET_PATHS = {
-    sky: 'assets/layout-v2/clean/ceu.jpg',
-    houseLeft: 'assets/layout-v2/clean/casa_left_estatica.png',
-    houseRight: 'assets/layout-v2/clean/casa_right_estatica.png',
-    lanternLeft: 'assets/layout-v2/clean/lanterna_left.png',
-    lanternRight: 'assets/layout-v2/clean/lanterna_right.png',
-    logo: 'assets/layout-v2/clean/logo_jogo.png',
-    mascot: 'assets/layout-v2/clean/mascote.png',
-    menuButton: 'assets/layout-v2/clean/botao_menu.png',
-    reelFrame: 'assets/layout-v2/clean/central_rolo_aposta.png',
-    displayFrame: 'assets/layout-v2/clean/display.png',
-    scoreFrame: 'assets/layout-v2/clean/placar.png',
-    lowerOrnament: 'assets/layout-v2/clean/arrabesco_inferior.png',
-    turboButton: 'assets/layout-v2/clean/botao_turbo.png',
-    minusButton: 'assets/layout-v2/clean/botao_menos.png',
-    spinButton: 'assets/layout-v2/clean/botao_jogar.png',
-    plusButton: 'assets/layout-v2/clean/botao_mais.png',
-    autoButton: 'assets/layout-v2/clean/botao_auto.png',
+    sky: 'assets/layout-v3/fundo.png',
+    roofLeft: 'assets/layout-v3/telhado_esquerda.png',
+    roofRight: 'assets/layout-v3/telhado_direita.png',
+    lantern: 'assets/layout-v3/balao.png',
+    cloud1: 'assets/layout-v3/nuvem1.png',
+    cloud2: 'assets/layout-v3/nuvem2.png',
+    logo: 'assets/layout-v3/logo.png',
+    menuButton: 'assets/layout-v3/btn_menu.png',
+    reelFrame: 'assets/layout-v3/central_rolos.png',
+    displayFrame: 'assets/layout-v3/display.png',
+    scoreFrame: 'assets/layout-v3/saldo_aposta.png',
+    lowerOrnament: 'assets/layout-v3/arabesco_baixo.png',
+    turboButton: 'assets/layout-v3/btn_turbo.png',
+    minusButton: 'assets/layout-v3/btn_menos.png',
+    spinButton: 'assets/layout-v3/btn_jogar.png',
+    plusButton: 'assets/layout-v3/btn_mais.png',
+    autoButton: 'assets/layout-v3/btn_auto.png',
     symbolBag: 'assets/symbols-v2/clean/10_simbolo_saco_fortuna.png',
     symbolIngot: 'assets/symbols-v2/clean/11_simbolo_lingote.png',
     symbolCoin: 'assets/symbols-v2/clean/12_simbolo_moeda_chinesa_esquerda.png',
@@ -976,16 +976,16 @@
       } else {
         const idleFrame = this.getIdleMascotFrame(time);
         ctx.save();
-        ctx.translate(390, 393 + mascotBob);
+        ctx.translate(390, 326 + mascotBob);
         ctx.rotate(mascotLean);
         if (mascotWinning) {
           ctx.shadowColor = '#ffd85e';
           ctx.shadowBlur = 20 + Math.sin(time * 0.012) * 7;
         }
-        this.drawImageContain(idleFrame, 0, 0, 250, 250);
+        this.drawImageContain(idleFrame, 0, 0, 252, 272);
         ctx.restore();
       }
-      this.drawImageContain(ASSETS.logo, 390, 140, 455, 255);
+      this.drawImageContain(ASSETS.logo, 390, 112, 420, 225);
       this.drawAmbientWisps(time);
       if (this.activeFeatureSpin || this.featureRemaining > 0 || this.state.startsWith('FEATURE_')) {
         const fortune = ctx.createRadialGradient(390, 820, 30, 390, 820, 760);
@@ -1024,32 +1024,14 @@
 
     drawMovingClouds(time) {
       const ctx = this.ctx;
-      const groups = [
-        { y: 300, speed: 0.0032, phase: 0, scale: 1 },
-        { y: 430, speed: 0.0021, phase: 410, scale: 0.72 },
-        { y: 210, speed: -0.0017, phase: 720, scale: 0.58 },
-      ];
       ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      groups.forEach((cloud, groupIndex) => {
-        const span = W + 300;
-        const raw = cloud.phase + time * cloud.speed;
-        const x = cloud.speed > 0 ? (raw % span) - 150 : W + 150 - ((-raw) % span);
-        ctx.save();
-        ctx.translate(x, cloud.y + Math.sin(time * 0.0004 + groupIndex) * 7);
-        ctx.scale(cloud.scale, cloud.scale);
-        [[-62, 8, 52], [-16, -10, 70], [44, 5, 56], [88, 18, 36]].forEach(([px, py, radius]) => {
-          const mist = ctx.createRadialGradient(px, py, 4, px, py, radius);
-          mist.addColorStop(0, 'rgba(255,250,255,0.16)');
-          mist.addColorStop(0.62, 'rgba(232,224,255,0.085)');
-          mist.addColorStop(1, 'rgba(220,210,255,0)');
-          ctx.fillStyle = mist;
-          ctx.beginPath();
-          ctx.arc(px, py, radius, 0, TAU);
-          ctx.fill();
-        });
-        ctx.restore();
-      });
+      ctx.globalAlpha = 0.58;
+      const driftA = Math.sin(time * 0.00012) * 24;
+      const driftB = Math.sin(time * 0.00009 + 2.4) * 20;
+      this.drawImageContain(ASSETS.cloud1, 184 + driftA, 365, 220, 92);
+      this.drawImageContain(ASSETS.cloud2, 603 + driftB, 390, 190, 88);
+      ctx.globalAlpha = 0.32;
+      this.drawImageContain(ASSETS.cloud2, 410 - driftA * 0.45, 282, 130, 62);
       ctx.restore();
     }
 
@@ -1069,12 +1051,12 @@
       const sway = Math.sin(elapsed * 0.012) * 0.025;
       const ctx = this.ctx;
       ctx.save();
-      ctx.translate(390, 360 + jump);
+      ctx.translate(390, 318 + jump);
       ctx.rotate(sway);
       ctx.scale(appear, appear);
       ctx.shadowColor = '#ffd75b';
       ctx.shadowBlur = 28 + Math.sin(time * 0.015) * 8;
-      this.drawImageContain(frame, 0, 0, 310, 335);
+      this.drawImageContain(frame, 0, 0, 292, 310);
       ctx.restore();
     }
 
@@ -1139,21 +1121,19 @@
     drawHouseScene(side, time) {
       const ctx = this.ctx;
       const left = side === 'left';
-      const house = left ? ASSETS.houseLeft : ASSETS.houseRight;
-      const lantern = left ? ASSETS.lanternLeft : ASSETS.lanternRight;
-      const rect = this.imageContainRect(house, left ? 74 : 706, 305, 190, 560);
-      if (!rect) return;
-      ctx.drawImage(house, rect.x, rect.y, rect.w, rect.h);
+      const roof = left ? ASSETS.roofLeft : ASSETS.roofRight;
+      const lantern = ASSETS.lantern;
+      const roofX = left ? 0 : 626;
+      const roofY = 90;
+      const roofW = 154;
+      const roofH = 422;
+      if (roof) ctx.drawImage(roof, roofX, roofY, roofW, roofH);
       if (!lantern) return;
-
-      const source = left
-        ? { x: 270, y: 450, pivotX: 140 }
-        : { x: 0, y: 450, pivotX: 145 };
-      const lanternX = rect.x + source.x * rect.scale;
-      const lanternY = rect.y + source.y * rect.scale;
-      const lanternW = lantern.width * rect.scale;
-      const lanternH = lantern.height * rect.scale;
-      const pivotX = lanternX + source.pivotX * rect.scale;
+      const lanternW = 64;
+      const lanternH = 115;
+      const lanternX = left ? 99 : 617;
+      const lanternY = 224;
+      const pivotX = lanternX + lanternW / 2;
       const sway = Math.sin(time * 0.00115 + (left ? 0 : 1.7)) * 0.032;
       const glowPulse = 0.78 + Math.sin(time * 0.0034 + (left ? 0.4 : 2.1)) * 0.22;
 
@@ -1299,7 +1279,7 @@
 
     drawReelFrame(time) {
       const ctx = this.ctx;
-      if (ASSETS.reelFrame) ctx.drawImage(ASSETS.reelFrame, 0, 450, W, 803);
+      if (ASSETS.reelFrame) ctx.drawImage(ASSETS.reelFrame, 0, 442, W, 798);
       else REEL_LAYOUT.forEach((reel) => this.roundRect(reel.x, reel.y, reel.w, reel.h, 14, '#17195d', '#f5b95e', 6));
     }
 
@@ -1992,7 +1972,7 @@
       const ctx = this.ctx;
       const idleSelection = this.state === 'IDLE';
       const winningLines = idleSelection
-        ? new Set(Array.from({ length: 10 }, (_, index) => index + 1))
+        ? new Set(Array.from({ length: this.level }, (_, index) => index + 1))
         : (this.state === 'WIN' && this.result.lines.length
           ? new Set((this.lineShowAll ? this.result.lines : [this.result.lines[this.lineCycle]]).map((line) => line.index + 1))
           : new Set());
@@ -2029,12 +2009,12 @@
       return ['#25134d', '#592875', '#b14888'];
     }
 
-        drawTicker() {
+    drawTicker() {
       const ctx = this.ctx;
       const x = PANEL_X;
-      const y = 1280;
+      const y = 1235;
       const w = PANEL_W;
-      const h = 78;
+      const h = 164;
       const isWin = /^WIN\s/.test(this.tickerText);
       const winElapsed = this.renderTime - this.tickerStarted;
       const accounting = isWin ? this.getWinAccounting(this.renderTime) : null;
@@ -2084,8 +2064,8 @@
       ctx.textAlign = this.tickerMode === 'center' ? 'center' : 'left';
       ctx.textBaseline = 'middle';
       const fittedSize = this.tickerMode === 'center' && this.tickerWidth > w - 70
-        ? Math.max(17, 27 * (w - 70) / this.tickerWidth)
-        : (isWin ? 34 : 27);
+        ? Math.max(19, 34 * (w - 70) / this.tickerWidth)
+        : (isWin ? 43 : 34);
       const textScale = isWin ? 0.72 + easeOutBack(clamp(winElapsed / 360, 0, 1)) * 0.28 : 1;
       const textX = this.tickerMode === 'center' ? x + w / 2 : this.tickerX;
       ctx.translate(textX, y + h / 2 + 1);
@@ -2120,24 +2100,20 @@
       const ctx = this.ctx;
       ctx.save();
       ctx.textAlign = 'center';
-      if (ASSETS.scoreFrame) ctx.drawImage(ASSETS.scoreFrame, 16, 1370, 748, 86);
-      else this.roundRect(16, 1370, 748, 86, 24, '#2d205e', '#f3b862', 5);
+      if (ASSETS.scoreFrame) ctx.drawImage(ASSETS.scoreFrame, 64, 1360, 652, 103);
+      else this.roundRect(64, 1360, 652, 103, 24, '#2d205e', '#f3b862', 5);
       const accounting = this.getWinAccounting(this.renderTime);
       const stats = [
-        { x: 157, label: 'SALDO', value: money(accounting.balance) },
-        { x: 390, label: 'GANHO TOTAL', value: money(accounting.gain), gold: true },
-        { x: 623, label: 'APOSTA', value: money(this.bet) },
+        { x: 227, value: money(accounting.balance) },
+        { x: 553, value: money(this.bet) },
       ];
       stats.forEach((stat) => {
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#ffdc62';
-        ctx.font = '800 16px Arial';
-        ctx.fillText(stat.label, stat.x, 1396);
-        ctx.fillStyle = stat.gold ? '#ffe061' : '#fff8eb';
-        ctx.font = '700 24px Arial';
-        ctx.fillText(stat.value, stat.x, 1425);
+        ctx.fillStyle = '#fff8eb';
+        ctx.font = '700 27px Arial';
+        ctx.fillText(stat.value, stat.x, 1427);
       });
-      this.hit(515, 1370, 249, 86, () => this.state === 'IDLE' && this.openOverlay('bet'));
+      this.hit(390, 1360, 326, 103, () => this.state === 'IDLE' && this.openOverlay('bet'));
       ctx.restore();
     }
 
@@ -2145,22 +2121,22 @@
       const ctx = this.ctx;
       const autoWasActive = this.autoActive;
       const controls = [
-        { id: 'turbo', x: 102, y: 1570, r: 49, image: ASSETS.turboButton, active: this.turbo, action: () => {
+        { id: 'turbo', x: 81, y: 1585, r: 58, image: ASSETS.turboButton, active: this.turbo, action: () => {
           this.turbo = !this.turbo;
           this.message = this.turbo ? 'TURBO ATIVADO' : 'TURBO DESATIVADO';
           this.enqueuePanel(this.message, 'center', 2600);
         } },
-        { id: 'minus', x: 212, y: 1570, r: 47, image: ASSETS.minusButton, action: () => {
+        { id: 'minus', x: 194, y: 1585, r: 46, image: ASSETS.minusButton, action: () => {
           if (this.state !== 'IDLE') return;
           this.level = clamp(this.level - 1, 1, 10);
           this.showPaylinePreview();
         } },
-        { id: 'plus', x: 568, y: 1570, r: 47, image: ASSETS.plusButton, action: () => {
+        { id: 'plus', x: 582, y: 1585, r: 46, image: ASSETS.plusButton, action: () => {
           if (this.state !== 'IDLE') return;
           this.level = clamp(this.level + 1, 1, 10);
           this.showPaylinePreview();
         } },
-        { id: 'auto', x: 678, y: 1570, r: 49, image: ASSETS.autoButton, active: this.autoActive, action: () => {
+        { id: 'auto', x: 694, y: 1585, r: 55, image: ASSETS.autoButton, active: this.autoActive, action: () => {
           if (autoWasActive) return;
           if (this.state === 'IDLE') this.openOverlay('auto');
         } },

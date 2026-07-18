@@ -48,10 +48,20 @@
 
 - O pacote antigo extraído de `imagens.zip` não é carregado pelo runtime e permanece somente em `reference/fortune-rabbit/`.
 - O pacote visual anterior permanece em `assets/fortune-deluxe/` como fallback e referência interna.
-- O runtime principal carrega a composição `assets/layout-v2/clean/` e os símbolos `assets/symbols-v2/clean/`.
+- O runtime principal carrega a composição final `assets/layout-v3/` e os símbolos `assets/symbols-v2/clean/`.
 - A composição completa, moldura vazia, dez símbolos, banner, barra de status e painel de controles são utilizados.
 - Os hashes do novo pacote estão em `reference/new-layout/assets.sha256`.
 - `99_referencia_completa.png` e a prancha Gemini também foram preservados em `reference/new-layout/`.
+
+## Composição responsiva v3
+
+- Pacote recebido em 17/07/2026 preservado em `PSD e originais/arquivos/`.
+- `referencia_posicao.png` foi usado somente como gabarito de proporção e posicionamento.
+- Elementos efetivamente carregados ficam em `assets/layout-v3/`: fundo, telhados, balão, nuvens, logo, moldura dos rolos, display, painel de saldo/aposta, arabesco inferior e botões.
+- O painel inferior agora contém somente `SALDO` e `APOSTA`; ganhos são apresentados no display imediatamente acima.
+- Todos os nove símbolos de runtime têm exatamente `300 × 300` pixels.
+- Quadros idle e de comemoração recebidos têm `500 × 500` pixels; a comemoração usa os cinco primeiros quadros.
+- As áreas de toque continuam calculadas no Canvas lógico `780 × 1688`, preservando resposta proporcional em diferentes telas.
 
 ## Composição separada v2
 
