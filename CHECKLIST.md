@@ -13,6 +13,15 @@ Legenda:
 
 ## Concluído
 
+### Leitura de nível e acabamento do display — 18/07/2026
+
+- [x] Mostrar `APOSTA 2` até `APOSTA 9` no display ao alterar o nível; preservar mensagens mínima e máxima nos limites.
+- [x] Mostrar `NÍVEL 2` até `NÍVEL 9` no painel inferior e manter o valor monetário centralizado.
+- [x] Exibir somente o valor dentro do display ao concluir um Grande Ganho.
+- [x] Abrir Vitória Máxima desde o início da premiação, com escurecimento sobre toda a tela.
+- [x] Manter Vitória Máxima aberta sem tempo limite e encerrar somente após toque do usuário.
+- [x] Expandir o recorte animado do display até as pontas arredondadas sem invadir o céu.
+
 ### Correções de carregamento, premiação e Rodada Automática — 18/07/2026
 
 - [x] Mostrar nos limites somente `APOSTA MÍNIMA/MÁXIMA` e o valor monetário, sem nível numérico.
