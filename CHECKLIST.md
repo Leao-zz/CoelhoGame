@@ -195,7 +195,7 @@ Legenda:
 
 ### Feedback de vitória — 18/07/2026
 
-- [x] Exibir ganhos de cada linha no display como `GANHOU: R$...`, sem repetir o número da linha.
+- [x] Exibir vitória no display somente como `WIN R$...`, sem repetir linha, categoria ou valor em seguida.
 - [x] Exibir Vitória Máxima em foco circular escuro no sol giratório, por 2 segundos e sem interação obrigatória.
 
 ### Cilindros e giro

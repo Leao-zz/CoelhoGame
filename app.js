@@ -57,6 +57,8 @@
     lantern: 'assets/layout-v3/balao_longo.png',
     cloud1: 'assets/layout-v3/nuvem1.png',
     cloud2: 'assets/layout-v3/nuvem2.png',
+    cloud3: 'assets/layout-v3/nuvem1.png',
+    cloud4: 'assets/layout-v3/nuvem2.png',
     logo: 'assets/layout-v3/logo.png',
     menuButton: 'assets/layout-v3/btn_menu.png',
     reelFrame: 'assets/layout-v3/central_rolos.png',
@@ -757,6 +759,7 @@
 
     advanceAfterResult(time) {
       this.completeBalanceTransfer();
+      if (this.lastWin > 0) this.advancePanel(time);
       if (this.pendingFeature) {
         this.pendingFeature = false;
         this.featureIntroStart = time;
@@ -918,7 +921,7 @@
         this.state = 'WIN';
         this.message = this.pendingFeature ? '8 RODADAS DA FORTUNA!' : `GANHO ${money(this.result.total)}`;
         this.activatePanelItem({
-          text: `WIN ${this.result.total.toFixed(2).replace('.', ',')}`,
+          text: `WIN ${money(this.result.total)}`,
           mode: 'center',
           duration: (this.getWinTiming().totalDuration + 1000) / 1.6,
         }, time);
@@ -1200,8 +1203,12 @@
       ctx.globalAlpha = 0.58;
       const driftA = Math.sin(time * 0.00012) * 24;
       const driftB = Math.sin(time * 0.00009 + 2.4) * 20;
-      this.drawImageContain(ASSETS.cloud1, 184 + driftA, 285, 220, 92);
-      this.drawImageContain(ASSETS.cloud2, 603 + driftB, 350, 190, 88);
+      this.drawImageContain(ASSETS.cloud1, 184 + driftA, 135, 120, 62);
+      this.drawImageContain(ASSETS.cloud2, 603 + driftB, 150, 190, 88);
+
+      this.drawImageContain(ASSETS.cloud3, 403 + driftB, 290, 190, 128);
+      this.drawImageContain(ASSETS.cloud4, 84 + driftA, 235, 120, 72);
+
       ctx.globalAlpha = 0.32;
       this.drawImageContain(ASSETS.cloud2, 410 - driftA * 0.45, 225, 130, 62);
       ctx.restore();
@@ -2271,15 +2278,7 @@
     }
 
     getWinBannerText(accounting) {
-      const phase = this.getWinLinePhase(this.renderTime);
-      const amount = money(accounting.counted);
-      if (phase.settling) return `GANHOU: ${amount}`;
-      if (!phase.showAll) {
-        return `GANHOU: ${amount}`;
-      }
-      if (this.winTier === 'max') return `GANHO TOTAL • ${money(this.result.total)}`;
-      if (this.winTier === 'big') return money(this.result.total);
-      return `${WIN_TIER_CONFIG[this.winTier]?.label || 'GANHO TOTAL'} • ${money(this.result.total)}`;
+      return `WIN ${money(accounting.counted)}`;
     }
 
     drawTicker() {
