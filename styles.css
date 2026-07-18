@@ -52,11 +52,49 @@ body {
   place-items: center;
   color: #ffe8ad;
   background: radial-gradient(circle at 50% 38%, #63265f, #170b2b 58%, #090511);
-  font-weight: 700;
-  font-size: 14px;
-  letter-spacing: 0.08em;
   transition: opacity 240ms ease;
-  padding-top: 8vh;
+  z-index: 20;
+}
+
+.loading-card {
+  width: min(78%, 330px);
+  display: grid;
+  gap: 14px;
+  text-align: center;
+  transform: translateY(5vh);
+}
+
+.loading-title {
+  color: #ffe8ad;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 12px #000;
+}
+
+.loading-track {
+  height: 15px;
+  overflow: hidden;
+  border: 2px solid #e9aa4f;
+  border-radius: 999px;
+  background: #160b31;
+  box-shadow: 0 0 18px #f6b44455, inset 0 2px 6px #000b;
+}
+
+.loading-progress {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f38b2d, #ffe96b 55%, #ff5ebf);
+  box-shadow: 0 0 15px #ffe36c;
+  transition: width 100ms ease-out;
+}
+
+.loading-percent {
+  color: #fff2bd;
+  font: 800 13px/1 Arial, sans-serif;
+  letter-spacing: 0.08em;
 }
 
 .loading.done {

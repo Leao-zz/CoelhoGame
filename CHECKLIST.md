@@ -13,6 +13,16 @@ Legenda:
 
 ## Concluído
 
+### Correções de carregamento, premiação e Rodada Automática — 18/07/2026
+
+- [x] Mostrar nos limites somente `APOSTA MÍNIMA/MÁXIMA` e o valor monetário, sem nível numérico.
+- [x] Restringir o escurecimento da vitória às janelas dos três cilindros.
+- [x] Usar o painel final com apenas `SALDO` e `APOSTA`, desenhando somente seus valores.
+- [x] Substituir a abertura promocional por carregamento real com barra e percentual, entrando diretamente no jogo.
+- [x] Evitar valor monetário duplicado sobre o símbolo de Prêmio.
+- [x] Mover o fechamento da Rodada Automática para junto de `INICIAR`, reduzir o botão principal e fechar ao tocar fora.
+- [x] Permitir arrastar o controle de parada automática com mouse ou toque.
+
 ### Estados progressivos de vitória e painel financeiro — 18/07/2026
 
 - [x] Classificar ganhos por razão sobre a aposta: pequena `<2×`, média `2–10×`, grande `10–50×`, mega `50–100×` e máxima `≥100×`.
@@ -26,7 +36,7 @@ Legenda:
 - [x] Transferir visualmente os valores das combinações para o painel de ganho.
 - [x] Atualizar o Saldo somente depois da contagem e aplicar pulso curto na confirmação.
 - [x] Manter a Aposta estável durante toda a sequência.
-- [x] Reintroduzir painel financeiro com `SALDO`, `GANHO TOTAL` e `APOSTA`, respeitando hierarquia de título e valor.
+- [x] Usar painel financeiro final com apenas `SALDO` e `APOSTA`; ganhos permanecem no display animado.
 - [x] Diferenciar brilho, moedas, partículas, fundo e reação do mascote em cada categoria.
 - [x] Adicionar confetes de cenoura e emblema FRD para Mega e Vitória Máxima.
 - [x] Criar tela especial para Vitória Máxima, ocultando controles e exibindo ação para continuar.
@@ -36,8 +46,8 @@ Legenda:
 
 ### Leitura da aposta, proporções e sequência de vitória — 17/07/2026
 
-- [x] Exibir o nível atual da aposta de `1` a `10` junto do valor monetário.
-- [x] Mostrar feedback imediato `APOSTA N • R$ valor` ao usar Mais/Menos.
+- [x] Exibir o valor monetário atual da aposta no painel inferior.
+- [x] Mostrar feedback imediato `APOSTA • R$ valor` ao usar Mais/Menos e mensagens específicas nos limites.
 - [x] Congelar os valores monetários dos símbolos de Prêmio no início da rodada, sem alterá-los quando a aposta muda depois do resultado.
 - [x] Aumentar a largura útil dos cilindros e reduzir os espaços laterais, preservando a composição `3 / 4 / 3`.
 - [x] Reduzir e subir o logotipo para liberar área visual para o jogo.
@@ -45,7 +55,7 @@ Legenda:
 - [x] Centralizar e redimensionar automaticamente o texto dos símbolos de Prêmio, sem prefixo `R$`.
 - [x] Manter uma pausa inicial, detalhar cada linha vencedora e reunir todas no fechamento.
 - [x] Aplicar categorias progressivas de ganho pequeno, médio, grande, mega e máximo.
-- [x] Manter no painel financeiro Saldo, Ganho Total e Aposta, com valores mais legíveis e indicação do nível.
+- [x] Manter no painel financeiro somente Saldo e Aposta; exibir ganhos no display animado.
 - [x] Diferenciar visualmente Turbo e Auto ativos e ampliar as áreas de toque dos controles.
 - [x] Bloquear Mais/Menos durante o giro.
 - [x] Validar a composição e a interação nos viewports móveis `430 × 932` e `360 × 800`.
@@ -166,7 +176,7 @@ Legenda:
 - [x] Integrar os elementos finais em `assets/layout-v3/` sem distorção.
 - [x] Reposicionar logo, menu, telhados, balões, nuvens e mascote conforme a referência.
 - [x] Reposicionar a moldura `3 / 4 / 3`, display, saldo/aposta e controles.
-- [x] Exibir `GANHO TOTAL` no placar inferior e manter o contexto detalhado no display animado.
+- [x] Remover `GANHO TOTAL` do placar inferior e manter o ganho no display animado.
 - [x] Remover títulos duplicados de `SALDO` e `APOSTA` no runtime.
 - [x] Substituir os nove símbolos por PNGs uniformes de `300 × 300`.
 - [x] Substituir animações idle e de vitória pelas versões compactadas de `500 × 500`.
@@ -346,7 +356,7 @@ Legenda:
 - [x] Somar o valor de `WIN` progressivamente durante a exibição de cada linha.
 - [x] Iniciar `WIN` no menor prêmio real da rodada e acelerar a contagem em 3×.
 - [x] Animar moedas saindo da linha marcada em direção ao painel de ganho.
-- [x] Transferir `GANHO TOTAL` para `SALDO` com contagem animada.
+- [x] Transferir o ganho exibido no display para `SALDO` com contagem animada.
 - [x] Alterar a cor do painel `WIN` conforme a categoria do prêmio.
 - [x] Criar URL de teste `?demo=mixed&skipOpening=1` para vitórias mistas.
 - [x] Criar servidor local com `npm start` e documentar por que `bash python3 ...` falha.

@@ -10,10 +10,18 @@
   <body>
     <main id="gameShell" class="game-shell" aria-label="CoelhoGame, demonstração de slot com saldo fictício">
       <canvas id="gameCanvas" width="1166" height="2434" aria-label="Área principal do jogo" tabindex="0"></canvas>
-      <div id="loading" class="loading" role="status">Preparando Fortune Rabbit Deluxe…</div>
+      <div id="loading" class="loading" role="status" aria-live="polite">
+        <div class="loading-card">
+          <div class="loading-title">Preparando Fortune Rabbit Deluxe</div>
+          <div class="loading-track" aria-hidden="true">
+            <div id="loadingProgress" class="loading-progress"></div>
+          </div>
+          <div id="loadingPercent" class="loading-percent">0%</div>
+        </div>
+      </div>
       <div id="liveStatus" class="sr-only" aria-live="polite"></div>
     </main>
     <script src="game-core.js?v=8"></script>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
   </body>
 </html>

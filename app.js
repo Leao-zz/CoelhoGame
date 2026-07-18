@@ -87,8 +87,6 @@
     idle3: 'assets/idle/clean/animacao_parado3.png',
     idle4: 'assets/idle/clean/animacao_parado4.png',
     idle5: 'assets/idle/clean/animacao_parado5.png',
-    openingBackground: 'assets/opening/clean/fundo_abertura.jpg',
-    openingButton: 'assets/opening/clean/fundo_botao.png',
     autoPanel: 'assets/automatic/tela_automatica.png',
     autoSelection: 'assets/automatic/marcacao_numeros.png',
     autoSliderKnob: 'assets/automatic/botao_spin.png',
@@ -99,19 +97,27 @@
   };
   const ASSETS = {};
 
-  function loadAssets() {
-    return Promise.all(Object.entries(ASSET_PATHS).map(([key, src]) => new Promise((resolve) => {
+  function loadAssets(onProgress = () => {}) {
+    const entries = Object.entries(ASSET_PATHS);
+    let loaded = 0;
+    onProgress(loaded, entries.length);
+    return Promise.all(entries.map(([key, src]) => new Promise((resolve) => {
       const image = new Image();
-      image.onload = () => { ASSETS[key] = image; resolve(); };
-      image.onerror = () => resolve();
+      const finish = () => {
+        loaded += 1;
+        onProgress(loaded, entries.length);
+        resolve();
+      };
+      image.onload = () => { ASSETS[key] = image; finish(); };
+      image.onerror = finish;
       image.src = src;
     })));
   }
   const PANEL_TIPS = [
-    { text: 'SÍMBOLOS DE PRÊMIO PAGAM ATÉ 500x!', mode: 'center', duration: 3400 },
-    { text: '5 OU MAIS PRÊMIOS PAGAM TODOS!', mode: 'center', duration: 3200 },
+    { text: 'SÍMBOLOS DE PRÊMIO PAGAM ATÉ 500x!', mode: 'scroll', duration: 3400 },
+    { text: '5 OU MAIS PRÊMIOS PAGAM TODOS!', mode: 'scroll', duration: 3200 },
     { text: '8 RODADAS DA FORTUNA COM SÍMBOLOS DE PRÊMIO!', mode: 'scroll' },
-    { text: 'WILD SUBSTITUI SÍMBOLOS COMUNS!', mode: 'center', duration: 3200 },
+    { text: 'WILD SUBSTITUI SÍMBOLOS COMUNS!', mode: 'scroll', duration: 3200 },
     { text: 'GANHE ATÉ 5000X!', mode: 'center', duration: 3000 },
     { text: 'LINHAS ATIVAS PAGAM DA ESQUERDA PARA A DIREITA!', mode: 'scroll' },
   ];
@@ -316,6 +322,7 @@
       this.overlay = null;
       this.overlayScroll = 0;
       this.dragStart = null;
+      this.autoSliderDrag = false;
       this.history = [];
       this.historyFilter = 'today';
       this.customDateFrom = null;
@@ -325,9 +332,6 @@
       this.spinStart = 0;
       this.winStart = 0;
       this.lastTime = performance.now();
-      this.openingActive = query.get('skipOpening') !== '1';
-      this.openingStarted = performance.now();
-      this.openingReadyAt = this.openingStarted + 4000;
       this.spinButtonAngle = 0;
       this.autoTotal = 0;
       this.buttonPress = null;
@@ -435,6 +439,24 @@
       this.canvas.addEventListener('pointerdown', (event) => {
         event.preventDefault();
         const p = point(event);
+        if (this.overlay === 'auto') {
+          const layout = this.getAutoOverlayLayout();
+          if (this.isAutoSliderPoint(p, layout)) {
+            this.sound.ready();
+            this.sound.button('button');
+            this.autoSliderDrag = true;
+            this.setAutoStopFromX(p.x, layout);
+            return;
+          }
+          const insidePanel = p.x >= layout.panel.x && p.x <= layout.panel.x + layout.panel.w
+            && p.y >= layout.panel.y && p.y <= layout.panel.y + layout.panel.h;
+          if (!insidePanel) {
+            this.sound.ready();
+            this.sound.button('button');
+            this.closeOverlay();
+            return;
+          }
+        }
         const target = [...this.hitAreas].reverse().find((area) => p.x >= area.x && p.x <= area.x + area.w && p.y >= area.y && p.y <= area.y + area.h);
         if (target) {
           this.sound.ready();
@@ -450,11 +472,19 @@
         }
       });
       this.canvas.addEventListener('pointermove', (event) => {
+        if (this.overlay === 'auto' && this.autoSliderDrag) {
+          event.preventDefault();
+          this.setAutoStopFromX(point(event).x, this.getAutoOverlayLayout());
+          return;
+        }
         if (!this.overlay || !this.dragStart) return;
         const p = point(event);
         this.overlayScroll = clamp(this.dragStart.scroll + this.dragStart.y - p.y, 0, this.overlayMaxScroll());
       });
-      window.addEventListener('pointerup', () => { this.dragStart = null; });
+      window.addEventListener('pointerup', () => {
+        this.dragStart = null;
+        this.autoSliderDrag = false;
+      });
       this.canvas.addEventListener('wheel', (event) => {
         if (!this.overlay) return;
         event.preventDefault();
@@ -705,10 +735,10 @@
       const nextLevel = clamp(this.level + direction, 1, 10);
       this.level = nextLevel;
       const message = nextLevel === 10
-        ? `APOSTA 10 • MÁXIMA • ${money(this.bet)}`
+        ? `APOSTA MÁXIMA • ${money(this.bet)}`
         : nextLevel === 1
-          ? `APOSTA 1 • MÍNIMA • ${money(this.bet)}`
-          : `APOSTA ${nextLevel} • ${money(this.bet)}`;
+          ? `APOSTA MÍNIMA • ${money(this.bet)}`
+          : `APOSTA • ${money(this.bet)}`;
       this.message = message;
       this.showPanelNow(message, 'center', 2600);
     }
@@ -1080,10 +1110,6 @@
         this.hitAreas = [];
         this.drawOverlay();
       }
-      if (this.openingActive) {
-        this.hitAreas = [];
-        this.drawOpeningOverlay(time);
-      }
       ctx.restore();
     }
 
@@ -1207,56 +1233,6 @@
       ctx.shadowBlur = 28 + Math.sin(time * 0.015) * 8;
       this.drawImageContain(frame, 0, 0, 292, 310);
       ctx.restore();
-    }
-
-    drawOpeningOverlay(time) {
-      const ctx = this.ctx;
-      if (ASSETS.openingBackground) ctx.drawImage(ASSETS.openingBackground, 0, 0, W, H);
-      else {
-        const fallback = ctx.createLinearGradient(0, 0, 0, H);
-        fallback.addColorStop(0, '#140850');
-        fallback.addColorStop(1, '#4b0c55');
-        ctx.fillStyle = fallback;
-        ctx.fillRect(0, 0, W, H);
-      }
-      const progress = clamp((time - this.openingStarted) / 4000, 0, 1);
-      if (progress < 1) {
-        ctx.save();
-        this.roundRect(120, 1560, 540, 58, 29, '#1a0a39cc', '#ffc95e', 4);
-        const shine = ctx.createLinearGradient(125, 0, 655, 0);
-        shine.addColorStop(0, '#ff8b28');
-        shine.addColorStop(0.55, '#ffe96b');
-        shine.addColorStop(1, '#ff55ba');
-        this.roundRect(128, 1568, 524 * progress, 42, 21, shine);
-        ctx.fillStyle = '#fff3c2';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = '900 25px Arial Black, Arial';
-        ctx.lineWidth = 6;
-        ctx.strokeStyle = '#401128';
-        const label = `CARREGANDO ${Math.round(progress * 100)}%`;
-        ctx.strokeText(label, 390, 1510);
-        ctx.fillText(label, 390, 1510);
-        ctx.restore();
-        return;
-      }
-      const readyElapsed = time - this.openingReadyAt;
-      const appear = clamp(readyElapsed / 420, 0, 1);
-      const pulse = 1 + Math.sin(readyElapsed * 0.005) * 0.025;
-      const pressed = this.pressScale('opening', time);
-      ctx.save();
-      ctx.globalAlpha = appear;
-      ctx.translate(390, 1565);
-      ctx.scale(pulse * pressed, pulse * pressed);
-      ctx.shadowColor = '#ffe55d';
-      ctx.shadowBlur = 25 + Math.sin(time * 0.008) * 8;
-      this.drawImageContain(ASSETS.openingButton, 0, 0, 340, 205);
-      ctx.restore();
-      this.hit(210, 1450, 360, 225, () => {
-        this.openingActive = false;
-        this.sound.startMusic();
-        this.burst(390, 1565, 45, '#ffe55d');
-      }, 'opening');
     }
 
     imageContainRect(image, cx, cy, maxW, maxH) {
@@ -2044,7 +2020,9 @@
         });
         ctx.restore();
       }
-      if (!this.lineShowAll && activeSteps.length === 1) this.drawStepPayout(activeSteps[0], time);
+      if (!this.lineShowAll && activeSteps.length === 1 && activeSteps[0].kind !== 'prize') {
+        this.drawStepPayout(activeSteps[0], time);
+      }
       this.drawWinCategory(time);
     }
 
@@ -2053,8 +2031,9 @@
       const intensity = { small: 0, medium: 0.04, big: 0.16, mega: 0.22, max: 0.29 }[this.winTier] || 0;
       if (intensity <= 0) return;
       ctx.save();
-      ctx.fillStyle = `rgba(10,5,34,${intensity})`;
-      ctx.fillRect(0, 170, W, 1040);
+      ctx.beginPath();
+      REEL_LAYOUT.forEach((reel) => ctx.rect(reel.x + 4, reel.y + 4, reel.w - 8, reel.h - 8));
+      ctx.clip();
       const pulse = 0.72 + Math.sin(time * 0.0045) * 0.28;
       const halo = ctx.createRadialGradient(390, 770, 80, 390, 770, this.winTier === 'max' ? 590 : 470);
       halo.addColorStop(0, `rgba(255,214,70,${(0.12 + intensity * 0.45) * pulse})`);
@@ -2070,7 +2049,9 @@
         ctx.shadowBlur = 18 + pulse * 18;
         const progress = ((time - this.winStart) * 0.00038) % 1;
         ctx.globalAlpha = 0.35 + progress * 0.45;
-        this.roundRect(REEL_FRAME.x + 14, REEL_FRAME.y + 8, REEL_FRAME.w - 28, REEL_FRAME.h - 16, 38, null, ctx.strokeStyle, 5);
+        REEL_LAYOUT.forEach((reel) => {
+          this.roundRect(reel.x + 7, reel.y + 7, reel.w - 14, reel.h - 14, 24, null, ctx.strokeStyle, 5);
+        });
       }
       ctx.restore();
     }
@@ -2222,7 +2203,7 @@
       ctx.restore();
 
       const frame = [ASSETS.celebration3, ASSETS.celebration4, ASSETS.celebration5]
-        [Math.floor(local / 230) % 3] || this.getIdleMascotFrame(time);
+      [Math.floor(local / 230) % 3] || this.getIdleMascotFrame(time);
       ctx.shadowColor = '#ffd94e';
       ctx.shadowBlur = 38;
       this.drawImageContain(frame, 390, 640 - Math.sin(local * 0.006) * 12, 360, 390);
@@ -2430,53 +2411,37 @@
       const ctx = this.ctx;
       ctx.save();
       ctx.textAlign = 'center';
-      const panelGradient = ctx.createLinearGradient(64, 1360, 716, 1463);
-      panelGradient.addColorStop(0, '#2b1766');
-      panelGradient.addColorStop(0.52, '#392177');
-      panelGradient.addColorStop(1, '#211453');
-      this.roundRect(64, 1360, 652, 103, 24, panelGradient, '#f3b862', 5);
-      ctx.strokeStyle = '#d89c45';
-      ctx.lineWidth = 3;
-      [281, 499].forEach((divider) => {
+      const panel = { x: 64, y: 1360, w: 652, h: 103 };
+      if (ASSETS.scoreFrame) ctx.drawImage(ASSETS.scoreFrame, panel.x, panel.y, panel.w, panel.h);
+      else {
+        const panelGradient = ctx.createLinearGradient(panel.x, panel.y, panel.x + panel.w, panel.y + panel.h);
+        panelGradient.addColorStop(0, '#2b1766');
+        panelGradient.addColorStop(1, '#211453');
+        this.roundRect(panel.x, panel.y, panel.w, panel.h, 24, panelGradient, '#f3b862', 5);
+        ctx.strokeStyle = '#d89c45';
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.moveTo(divider, 1368);
-        ctx.lineTo(divider, 1455);
+        ctx.moveTo(390, 1368);
+        ctx.lineTo(390, 1455);
         ctx.stroke();
-      });
+      }
       const accounting = this.getWinAccounting(this.renderTime);
       ctx.textBaseline = 'middle';
-      ctx.font = '800 14px Arial, sans-serif';
-      ctx.fillStyle = '#e8dba9';
-      ctx.fillText('SALDO', 173, 1384);
-      ctx.fillText('GANHO TOTAL', 390, 1384);
-      ctx.fillText(`APOSTA • NÍVEL ${this.level}`, 607, 1384);
 
       const pulseAge = this.balancePulseStart ? this.renderTime - this.balancePulseStart : Infinity;
       const balancePulse = pulseAge < 620 ? 1 + Math.sin(clamp(pulseAge / 620, 0, 1) * Math.PI) * 0.08 : 1;
       ctx.save();
-      ctx.translate(173, 1425);
+      ctx.translate(226, 1428);
       ctx.scale(balancePulse, balancePulse);
       ctx.fillStyle = '#fff9e5';
       ctx.font = '900 25px Arial Black, Arial';
       ctx.fillText(money(accounting.balance), 0, 0);
       ctx.restore();
 
-      const currentGain = this.state === 'WIN' ? accounting.gain : 0;
-      const gainPulse = currentGain > 0 ? 1 + Math.sin(this.renderTime * 0.012) * 0.025 : 1;
-      ctx.save();
-      ctx.translate(390, 1425);
-      ctx.scale(gainPulse, gainPulse);
-      ctx.fillStyle = currentGain > 0 ? '#ffe266' : '#d8d3dc';
-      ctx.shadowColor = currentGain > 0 ? '#ffc536' : 'transparent';
-      ctx.shadowBlur = currentGain > 0 ? 12 : 0;
-      ctx.font = '900 26px Arial Black, Arial';
-      ctx.fillText(money(currentGain), 0, 0);
-      ctx.restore();
-
       ctx.fillStyle = '#fff9e5';
       ctx.font = '900 25px Arial Black, Arial';
-      ctx.fillText(money(this.bet), 607, 1425);
-      this.hit(499, 1360, 217, 103, () => this.state === 'IDLE' && this.openOverlay('bet'));
+      ctx.fillText(money(this.bet), 554, 1428);
+      this.hit(390, panel.y, panel.w / 2, panel.h, () => this.state === 'IDLE' && this.openOverlay('bet'));
       ctx.restore();
     }
 
@@ -2524,21 +2489,29 @@
       const autoWasActive = this.autoActive;
       const betControlsDisabled = this.state !== 'IDLE';
       const controls = [
-        { id: 'turbo', x: 78, y: 1585, r: 64, image: ASSETS.turboButton, active: this.turbo, action: () => {
-          this.turbo = !this.turbo;
-          this.message = this.turbo ? 'RODADA TURBO ATIVADA' : 'RODADA TURBO DESATIVADA';
-          this.enqueuePanel(this.message, 'center', 2600);
-        } },
-        { id: 'minus', x: 194, y: 1585, r: 51, image: ASSETS.minusButton, disabled: betControlsDisabled, action: () => {
-          this.adjustBetLevel(-1);
-        } },
-        { id: 'plus', x: 582, y: 1585, r: 51, image: ASSETS.plusButton, disabled: betControlsDisabled, action: () => {
-          this.adjustBetLevel(1);
-        } },
-        { id: 'auto', x: 699, y: 1585, r: 61, image: ASSETS.autoButton, active: this.autoActive, action: () => {
-          if (autoWasActive) return;
-          if (this.state === 'IDLE') this.openOverlay('auto');
-        } },
+        {
+          id: 'turbo', x: 78, y: 1585, r: 64, image: ASSETS.turboButton, active: this.turbo, action: () => {
+            this.turbo = !this.turbo;
+            this.message = this.turbo ? 'RODADA TURBO ATIVADA' : 'RODADA TURBO DESATIVADA';
+            this.enqueuePanel(this.message, 'center', 2600);
+          }
+        },
+        {
+          id: 'minus', x: 194, y: 1585, r: 51, image: ASSETS.minusButton, disabled: betControlsDisabled, action: () => {
+            this.adjustBetLevel(-1);
+          }
+        },
+        {
+          id: 'plus', x: 582, y: 1585, r: 51, image: ASSETS.plusButton, disabled: betControlsDisabled, action: () => {
+            this.adjustBetLevel(1);
+          }
+        },
+        {
+          id: 'auto', x: 699, y: 1585, r: 61, image: ASSETS.autoButton, active: this.autoActive, action: () => {
+            if (autoWasActive) return;
+            if (this.state === 'IDLE') this.openOverlay('auto');
+          }
+        },
       ];
 
       if (ASSETS.lowerOrnament) ctx.drawImage(ASSETS.lowerOrnament, 0, 1454, W, 274);
@@ -2691,6 +2664,38 @@
     adjustAutoStopAmount(direction) {
       this.autoStopAmount = clamp(
         this.autoStopAmount + direction * AUTO_STOP_STEP,
+        AUTO_STOP_MIN,
+        AUTO_STOP_MAX,
+      );
+      this.autoLimits.loss = this.autoStopAmount;
+    }
+
+    getAutoOverlayLayout() {
+      const panel = { x: 10, y: 386, w: 760, h: 570 };
+      const scale = panel.w / 1448;
+      const mapX = (sourceX) => panel.x + sourceX * scale;
+      const mapY = (sourceY) => panel.y + sourceY * scale;
+      return {
+        panel,
+        scale,
+        mapX,
+        mapY,
+        sliderStart: mapX(395),
+        sliderEnd: mapX(1058),
+        sliderY: mapY(778),
+      };
+    }
+
+    isAutoSliderPoint(point, layout = this.getAutoOverlayLayout()) {
+      return point.x >= layout.sliderStart - 22 && point.x <= layout.sliderEnd + 22
+        && point.y >= layout.sliderY - 38 && point.y <= layout.sliderY + 38;
+    }
+
+    setAutoStopFromX(x, layout = this.getAutoOverlayLayout()) {
+      const progress = clamp((x - layout.sliderStart) / (layout.sliderEnd - layout.sliderStart), 0, 1);
+      const raw = AUTO_STOP_MIN + progress * (AUTO_STOP_MAX - AUTO_STOP_MIN);
+      this.autoStopAmount = clamp(
+        Math.round(raw / AUTO_STOP_STEP) * AUTO_STOP_STEP,
         AUTO_STOP_MIN,
         AUTO_STOP_MAX,
       );
@@ -2853,10 +2858,8 @@
     drawAutoOverlay() {
       const ctx = this.ctx;
       const time = this.renderTime;
-      const panel = { x: 10, y: 386, w: 760, h: 570 };
-      const scale = panel.w / 1448;
-      const mapX = (sourceX) => panel.x + sourceX * scale;
-      const mapY = (sourceY) => panel.y + sourceY * scale;
+      const layout = this.getAutoOverlayLayout();
+      const { panel, mapX, mapY, sliderStart, sliderEnd, sliderY } = layout;
       ctx.fillStyle = '#050315d1';
       ctx.fillRect(0, 0, W, H);
       ctx.save();
@@ -2864,6 +2867,20 @@
       ctx.shadowBlur = 34;
       if (ASSETS.autoPanel) ctx.drawImage(ASSETS.autoPanel, panel.x, panel.y, panel.w, panel.h);
       else this.roundRect(panel.x, panel.y, panel.w, panel.h, 26, '#12113a', '#ffbe43', 6);
+      ctx.restore();
+
+      // A arte-base trazia um X no cabeçalho. Ele é neutralizado porque o
+      // controle real fica ao lado de INICIAR, dentro da zona de ação.
+      const oldCloseX = mapX(1177);
+      const oldCloseY = mapY(221);
+      ctx.save();
+      const patch = ctx.createRadialGradient(oldCloseX, oldCloseY, 4, oldCloseX, oldCloseY, 51);
+      patch.addColorStop(0, '#151142');
+      patch.addColorStop(1, '#09082b');
+      ctx.fillStyle = patch;
+      ctx.beginPath();
+      ctx.arc(oldCloseX, oldCloseY, 45, 0, TAU);
+      ctx.fill();
       ctx.restore();
 
       const counts = [10, 30, 50, 80, 100];
@@ -2905,9 +2922,6 @@
       ctx.fillText(formattedStop, 390, mapY(682));
       ctx.restore();
 
-      const sliderStart = mapX(395);
-      const sliderEnd = mapX(1058);
-      const sliderY = mapY(778);
       const sliderProgress = (this.autoStopAmount - AUTO_STOP_MIN) / (AUTO_STOP_MAX - AUTO_STOP_MIN);
       const knobX = lerp(sliderStart, sliderEnd, sliderProgress);
       const sliderGradient = ctx.createLinearGradient(sliderStart, sliderY, sliderEnd, sliderY);
@@ -2941,26 +2955,32 @@
         this.hit(button.x - 42, sliderY - 40, 84, 80, button.action, button.id);
       });
 
-      const closeX = mapX(1177);
-      const closeY = mapY(221);
+      const startY = mapY(966);
+      const startX = 345;
+      const startW = 268;
+      const startH = 73;
+      const closeX = 575;
+      const closeY = startY;
       const closePressed = this.pressScale('auto-close', time);
       ctx.save();
       ctx.translate(closeX, closeY);
       ctx.scale(closePressed, closePressed);
-      this.drawImageContain(ASSETS.autoClose, 0, 0, 74, 82);
+      const closePulse = 0.7 + Math.sin(time * 0.008) * 0.3;
+      ctx.shadowColor = '#ff513d';
+      ctx.shadowBlur = 18 + closePulse * 12;
+      this.drawImageContain(ASSETS.autoClose, 0, 0, 68, 75);
       ctx.restore();
-      this.hit(closeX - 43, closeY - 46, 86, 92, () => this.closeOverlay(), 'auto-close');
+      this.hit(closeX - 43, closeY - 45, 86, 90, () => this.closeOverlay(), 'auto-close');
 
-      const startY = mapY(966);
       const startPressed = this.pressScale('auto-start', time);
       ctx.save();
-      ctx.translate(390, startY);
+      ctx.translate(startX, startY);
       ctx.scale(startPressed, startPressed);
       ctx.shadowColor = '#7dff4c';
       ctx.shadowBlur = 12;
-      this.drawImageContain(ASSETS.autoStart, 0, 0, 315, 86);
+      this.drawImageContain(ASSETS.autoStart, 0, 0, startW, startH);
       ctx.restore();
-      this.hit(225, startY - 48, 330, 96, () => this.startAuto(this.autoSelectedCount), 'auto-start');
+      this.hit(startX - startW / 2 - 8, startY - startH / 2 - 8, startW + 16, startH + 16, () => this.startAuto(this.autoSelectedCount), 'auto-start');
     }
 
     drawPaytableOverlay() {
@@ -3438,10 +3458,19 @@
   }
 
   const canvas = document.getElementById('gameCanvas');
-  loadAssets().finally(() => {
+  const loading = document.getElementById('loading');
+  const loadingProgress = document.getElementById('loadingProgress');
+  const loadingPercent = document.getElementById('loadingPercent');
+  loadAssets((loaded, total) => {
+    const progress = total ? loaded / total : 1;
+    loadingProgress.style.width = `${Math.round(progress * 100)}%`;
+    loadingPercent.textContent = `${Math.round(progress * 100)}%`;
+  }).finally(() => {
     const game = new Game(canvas);
     game.start();
-    document.getElementById('loading').classList.add('done');
+    loadingProgress.style.width = '100%';
+    loadingPercent.textContent = '100%';
+    loading.classList.add('done');
     window.coelhoGame = game;
   });
 })();
