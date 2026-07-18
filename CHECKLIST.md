@@ -13,6 +13,8 @@ Legenda:
 
 ## Concluído
 
+- [x] Adicionar efeitos OGG específicos para ganho normal, grande ganho, super ganho e mega ganho, respeitando controle de efeitos.
+
 - [x] Rodada automática inicia imediatamente ao escolher 10, 30, 50, 80 ou 100 rodadas; botão INICIAR e X antigo removidos; novo botão FECHAR adicionado na base.
 
 ### Leitura de nível e acabamento do display — 18/07/2026

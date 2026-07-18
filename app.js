@@ -16,7 +16,7 @@
   const AUTO_STOP_MIN = 1600;
   const AUTO_STOP_MAX = 3200;
   const AUTO_STOP_STEP = 100;
-  const ASSET_VERSION = '22';
+  const ASSET_VERSION = '23';
   const WIN_TIER_CONFIG = Object.freeze({
     small: {
       minRatio: 0, maxRatio: 2, label: 'GANHO', settle: 220, lineDuration: 650,
@@ -152,6 +152,22 @@
       this.music.volume = 0.15;
       this.music.setAttribute('playsinline', '');
       document.body.appendChild(this.music);
+      this.winSounds = {
+        normal: this.createEffectAudio('assets/audio/01_normal_win_v2.ogg', 0.58),
+        big: this.createEffectAudio('assets/audio/02_big_win_v2.ogg', 0.62),
+        super: this.createEffectAudio('assets/audio/03_super_win_v2.ogg', 0.66),
+        mega: this.createEffectAudio('assets/audio/04_mega_win_v2.ogg', 0.7),
+      };
+    }
+
+    createEffectAudio(src, volume) {
+      const audio = new Audio(`${src}?v=${ASSET_VERSION}`);
+      audio.hidden = true;
+      audio.preload = 'auto';
+      audio.volume = volume;
+      audio.setAttribute('playsinline', '');
+      document.body.appendChild(audio);
+      return audio;
     }
 
     ready() {
@@ -174,7 +190,13 @@
     setEffectsEnabled(enabled) {
       this.effectsEnabled = enabled;
       if (enabled) this.ready();
-      else this.stopSpin();
+      else {
+        this.stopSpin();
+        Object.values(this.winSounds).forEach((audio) => {
+          audio.pause();
+          audio.currentTime = 0;
+        });
+      }
     }
 
     startMusic() {
@@ -291,6 +313,24 @@
       [0, 4, 7, 12].forEach((semi, index) => this.tone(base * Math.pow(2, semi / 12), 0.38, big ? 0.17 : 0.13, 'triangle', index * 0.105));
       [0, 1, 2, 3, 4, 5].forEach((step) => this.tone(1150 + step * 135, 0.09, 0.055, 'sine', 0.08 + step * 0.07));
       this.noise(0.32, big ? 0.12 : 0.075, 2200, 0.04);
+    }
+
+    playWinTier(tier) {
+      if (!this.effectsEnabled) return;
+      const soundKey = tier === 'max'
+        ? 'mega'
+        : tier === 'mega'
+          ? 'super'
+          : tier === 'big'
+            ? 'big'
+            : 'normal';
+      Object.values(this.winSounds).forEach((audio) => {
+        audio.pause();
+        audio.currentTime = 0;
+      });
+      const audio = this.winSounds[soundKey];
+      const playback = audio.play();
+      if (playback) playback.catch(() => { /* reprodução depende de interação do usuário */ });
     }
   }
 
@@ -988,7 +1028,7 @@
       if (this.winEffectsStarted) return;
       this.winEffectsStarted = true;
       const config = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.small;
-      this.sound.win(this.winTier === 'big' || this.winTier === 'mega' || this.winTier === 'max');
+      this.sound.playWinTier(this.winTier);
       this.burst(W / 2, 1120, config.sparks, '#ffd44d');
       if (config.coins) this.coinRain(config.coins);
       if (this.winTier === 'mega' || this.winTier === 'max') this.launchCelebrationConfetti(this.winTier === 'max' ? 68 : 38);
