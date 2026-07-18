@@ -13,6 +13,8 @@ Legenda:
 
 ## Concluído
 
+- [x] Rodada automática inicia imediatamente ao escolher 10, 30, 50, 80 ou 100 rodadas; botão INICIAR e X antigo removidos; novo botão FECHAR adicionado na base.
+
 ### Leitura de nível e acabamento do display — 18/07/2026
 
 - [x] Mostrar `APOSTA 2` até `APOSTA 9` no display ao alterar o nível; preservar mensagens mínima e máxima nos limites.
@@ -36,6 +38,9 @@ Legenda:
 
 - [x] Classificar ganhos por razão sobre a aposta: pequena `<2×`, média `2–10×`, grande `10–50×`, mega `50–100×` e máxima `≥100×`.
 - [x] Substituir os títulos textuais de Grande e Mega Ganho por artes próprias, com entrada luminosa e efeitos distintos.
+- [x] Centralizar as artes de Grande e Mega Ganho e aplicar vinheta escura recortada somente sobre os rolos.
+- [x] Exibir Grande e Mega Ganho antes da sequência individual das linhas vencedoras.
+- [x] Versionar URLs dos assets para atualizar imagens modificadas também no servidor Python.
 - [x] Manter as faixas e intensidades configuráveis em um único mapa no código.
 - [x] Preservar o resultado completo por `90–250 ms` antes de iniciar qualquer destaque.
 - [x] Apresentar combinações vencedoras uma por vez e reunir todas somente no fechamento.

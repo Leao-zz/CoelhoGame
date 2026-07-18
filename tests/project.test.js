@@ -79,11 +79,23 @@ assert.match(app, /if \(this\.overlay === 'auto'\)/);
 assert.match(app, /AUTO_STOP_MIN = 1600/);
 assert.match(app, /AUTO_STOP_MAX = 3200/);
 assert.match(app, /adjustAutoStopAmount/);
-assert.match(app, /autoSelectedCount/);
+assert.doesNotMatch(app, /autoSelectedCount/);
+assert.match(app, /\(\) => this\.startAuto\(count\), id/);
+assert.doesNotMatch(app, /ASSETS\.autoStart/);
 assert.match(app, /target\.id !== 'turbo'/);
 assert.match(app, /panelQueue/);
 assert.doesNotMatch(app, /drawOpeningOverlay/);
 assert.match(app, /loadAssets\(onProgress/);
+assert.match(app, /setTimeout\(finish, 6000\)/);
+assert.match(html, /app\.js\?v=22/);
+assert.match(app, /if \(elapsed < timing\.settleDuration\) \{\s*this\.drawWinCategory\(time\);\s*return;/);
+assert.match(app, /const ASSET_VERSION = '22'/);
+assert.match(app, /image\.src = `\$\{src\}\?v=\$\{ASSET_VERSION\}`/);
+assert.match(app, /categoryIntroDuration/);
+assert.match(app, /this\.turbo \? 900 : 2200/);
+assert.match(app, /this\.turbo \? 760 : 1800/);
+assert.match(app, /Vinheta escura no formato dos três rolos/);
+assert.match(app, /isMega \? 610 : 570/);
 assert.match(app, /loadingProgress\.style\.width/);
 assert.match(app, /stopAuto/);
 assert.match(app, /drawCelebrationMascot/);
@@ -138,8 +150,8 @@ for (const autoAsset of [
   'botao_spin.png',
   'menos.png',
   'mais.png',
-  'iniciar.png',
   'fechar.png',
+  'fechar_largo.png',
 ]) {
   assert.ok(fs.existsSync(path.join(root, 'assets/automatic', autoAsset)));
 }

@@ -16,6 +16,7 @@
   const AUTO_STOP_MIN = 1600;
   const AUTO_STOP_MAX = 3200;
   const AUTO_STOP_STEP = 100;
+  const ASSET_VERSION = '22';
   const WIN_TIER_CONFIG = Object.freeze({
     small: {
       minRatio: 0, maxRatio: 2, label: 'GANHO', settle: 220, lineDuration: 650,
@@ -96,8 +97,7 @@
     autoSliderKnob: 'assets/automatic/botao_spin.png',
     autoMinus: 'assets/automatic/menos.png',
     autoPlus: 'assets/automatic/mais.png',
-    autoStart: 'assets/automatic/iniciar.png',
-    autoClose: 'assets/automatic/fechar.png',
+    autoClose: 'assets/automatic/fechar_largo.png',
   };
   const ASSETS = {};
 
@@ -107,14 +107,19 @@
     onProgress(loaded, entries.length);
     return Promise.all(entries.map(([key, src]) => new Promise((resolve) => {
       const image = new Image();
+      let finished = false;
       const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
         loaded += 1;
         onProgress(loaded, entries.length);
         resolve();
       };
+      const timeout = setTimeout(finish, 6000);
       image.onload = () => { ASSETS[key] = image; finish(); };
       image.onerror = finish;
-      image.src = src;
+      image.src = `${src}?v=${ASSET_VERSION}`;
     })));
   }
   const PANEL_TIPS = [
@@ -305,7 +310,6 @@
       this.autoActive = false;
       this.autoStartBalance = this.balance;
       this.autoLimits = { loss: AUTO_STOP_MIN, gain: 0, single: 0 };
-      this.autoSelectedCount = 10;
       this.autoStopAmount = AUTO_STOP_MIN;
       this.featureRemaining = 0;
       this.featureTotal = 0;
@@ -612,7 +616,13 @@
       const config = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.small;
       const steps = this.getWinSteps();
       const count = steps.length;
-      const settleDuration = this.turbo ? 90 : config.settle;
+      const baseSettleDuration = this.turbo ? 90 : config.settle;
+      const categoryIntroDuration = this.winTier === 'mega'
+        ? (this.turbo ? 900 : 2200)
+        : this.winTier === 'big'
+          ? (this.turbo ? 760 : 1800)
+          : 0;
+      const settleDuration = baseSettleDuration + categoryIntroDuration;
       const stepDuration = count ? (this.turbo ? 240 : config.lineDuration) : 0;
       const stepEnd = settleDuration + stepDuration * count;
       const rawStepTotal = steps.reduce((sum, step) => sum + step.amount, 0);
@@ -621,6 +631,8 @@
       const transferStart = stepEnd + Math.max(this.turbo ? 120 : 320, finalDuration * 0.34);
       const transferDuration = this.turbo ? 240 : Math.min(760, finalDuration * 0.42);
       return {
+        baseSettleDuration,
+        categoryIntroDuration,
         settleDuration,
         stepDuration,
         stepEnd,
@@ -1955,7 +1967,10 @@
       if (this.state !== 'WIN') return;
       const timing = this.getWinTiming();
       const elapsed = time - this.winStart;
-      if (elapsed < timing.settleDuration) return;
+      if (elapsed < timing.settleDuration) {
+        this.drawWinCategory(time);
+        return;
+      }
       const ctx = this.ctx;
       const pulse = 0.55 + 0.45 * Math.sin((time - this.winStart) * 0.014);
       const steps = this.getWinSteps();
@@ -2127,13 +2142,18 @@
       // A vitória máxima já possui uma celebração de tela inteira. Evita repetir
       // o mesmo título no banner intermediário enquanto o overlay está visível.
       if (this.winTier === 'max') return;
+      if (this.winTier === 'big' || this.winTier === 'mega') {
+        const introElapsed = elapsed - timing.baseSettleDuration;
+        if (introElapsed < 0 || introElapsed >= timing.categoryIntroDuration) return;
+        const fadeDuration = this.turbo ? 150 : 300;
+        const appear = clamp(introElapsed / fadeDuration, 0, 1)
+          * clamp((timing.categoryIntroDuration - introElapsed) / fadeDuration, 0, 1);
+        this.drawWinCategoryArtwork(time, introElapsed, appear);
+        return;
+      }
       if (!this.lineShowAll || elapsed < timing.stepEnd) return;
       const finalElapsed = elapsed - timing.stepEnd;
       const appear = clamp(finalElapsed / 380, 0, 1) * clamp((timing.totalDuration - elapsed) / 320, 0, 1);
-      if (this.winTier === 'big' || this.winTier === 'mega') {
-        this.drawWinCategoryArtwork(time, finalElapsed, appear);
-        return;
-      }
       const category = {
         small: { label: 'GANHO', color: '#fff5c4', width: 300, font: 30 },
         medium: { label: 'ÓTIMO GANHO', color: '#fff0a3', width: 390, font: 34 },
@@ -2184,7 +2204,7 @@
       if (!artwork) return;
       const ctx = this.ctx;
       const cx = 390;
-      const cy = isMega ? 995 : 1035;
+      const cy = isMega ? 790 : 825;
       const entryDuration = isMega ? 520 : 440;
       const entry = easeOutBack(clamp(finalElapsed / entryDuration, 0, 1));
       const scale = (isMega ? 0.62 : 0.7) + entry * (isMega ? 0.38 : 0.3);
@@ -2194,6 +2214,29 @@
 
       ctx.save();
       ctx.globalAlpha = appear;
+
+      // Vinheta escura no formato dos três rolos. Mantém cenário intacto e
+      // elimina competição visual dos símbolos atrás da placa de celebração.
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(31, 449);
+      ctx.lineTo(275, 449);
+      ctx.lineTo(275, 403);
+      ctx.lineTo(506, 403);
+      ctx.lineTo(506, 449);
+      ctx.lineTo(749, 449);
+      ctx.lineTo(749, 1205);
+      ctx.lineTo(31, 1205);
+      ctx.closePath();
+      ctx.clip();
+      const veil = ctx.createRadialGradient(cx, cy, 105, cx, cy, 520);
+      veil.addColorStop(0, isMega ? 'rgba(20,5,34,0.36)' : 'rgba(20,8,20,0.4)');
+      veil.addColorStop(0.48, isMega ? 'rgba(11,3,26,0.63)' : 'rgba(12,5,17,0.64)');
+      veil.addColorStop(1, 'rgba(3,2,10,0.78)');
+      ctx.fillStyle = veil;
+      ctx.fillRect(20, 395, 740, 820);
+      ctx.restore();
+
       ctx.translate(cx, cy);
 
       // Clarão circular e raios curtos, restritos à área dos rolos.
@@ -2240,8 +2283,8 @@
       ctx.save();
       ctx.scale(scale * pulse, scale * pulse);
       ctx.shadowColor = isMega ? '#ff66d2' : '#ffc94c';
-      ctx.shadowBlur = isMega ? 34 + burst * 24 : 24 + burst * 18;
-      this.drawImageContain(artwork, 0, 0, isMega ? 520 : 485, isMega ? 420 : 335);
+      ctx.shadowBlur = isMega ? 42 + burst * 28 : 32 + burst * 22;
+      this.drawImageContain(artwork, 0, 0, isMega ? 610 : 570, isMega ? 500 : 400);
       ctx.restore();
       ctx.restore();
     }
@@ -2728,10 +2771,6 @@
       if (this.state === 'IDLE') this.spin();
     }
 
-    selectAutoCount(count) {
-      this.autoSelectedCount = count;
-    }
-
     adjustAutoStopAmount(direction) {
       this.autoStopAmount = clamp(
         this.autoStopAmount + direction * AUTO_STOP_STEP,
@@ -2941,7 +2980,7 @@
       ctx.restore();
 
       // A arte-base trazia um X no cabeçalho. Ele é neutralizado porque o
-      // controle real fica ao lado de INICIAR, dentro da zona de ação.
+      // único controle de fechar agora fica na base do painel.
       const oldCloseX = mapX(1177);
       const oldCloseY = mapY(221);
       ctx.save();
@@ -2959,14 +2998,14 @@
       const countY = mapY(454);
       counts.forEach((count, index) => {
         const id = `auto-${count}`;
-        const selected = this.autoSelectedCount === count;
-        if (selected || (this.buttonPress && this.buttonPress.id === id && time < this.buttonPress.until)) {
+        const pressedNow = this.buttonPress && this.buttonPress.id === id && time < this.buttonPress.until;
+        if (pressedNow) {
           const pressed = this.pressScale(id, time);
           ctx.save();
           ctx.translate(countCenters[index], countY);
           ctx.scale(pressed, pressed);
           ctx.shadowColor = '#ffcc3d';
-          ctx.shadowBlur = selected ? 14 : 7;
+          ctx.shadowBlur = 14;
           this.drawImageContain(ASSETS.autoSelection, 0, 0, 104, 63);
           ctx.fillStyle = '#ffe56a';
           ctx.strokeStyle = '#6b2609';
@@ -2978,7 +3017,7 @@
           ctx.fillText(String(count), 0, 2);
           ctx.restore();
         }
-        this.hit(countCenters[index] - 54, countY - 36, 108, 72, () => this.selectAutoCount(count), id);
+        this.hit(countCenters[index] - 54, countY - 36, 108, 72, () => this.startAuto(count), id);
       });
 
       ctx.save();
@@ -3026,32 +3065,19 @@
         this.hit(button.x - 42, sliderY - 40, 84, 80, button.action, button.id);
       });
 
-      const startY = mapY(966);
-      const startX = 345;
-      const startW = 268;
-      const startH = 73;
-      const closeX = 575;
-      const closeY = startY;
+      const closeX = 390;
+      const closeY = mapY(966);
+      const closeW = 238;
+      const closeH = 65;
       const closePressed = this.pressScale('auto-close', time);
       ctx.save();
       ctx.translate(closeX, closeY);
       ctx.scale(closePressed, closePressed);
-      const closePulse = 0.7 + Math.sin(time * 0.008) * 0.3;
-      ctx.shadowColor = '#ff513d';
-      ctx.shadowBlur = 18 + closePulse * 12;
-      this.drawImageContain(ASSETS.autoClose, 0, 0, 68, 75);
-      ctx.restore();
-      this.hit(closeX - 43, closeY - 45, 86, 90, () => this.closeOverlay(), 'auto-close');
-
-      const startPressed = this.pressScale('auto-start', time);
-      ctx.save();
-      ctx.translate(startX, startY);
-      ctx.scale(startPressed, startPressed);
-      ctx.shadowColor = '#7dff4c';
+      ctx.shadowColor = '#ffbe43';
       ctx.shadowBlur = 12;
-      this.drawImageContain(ASSETS.autoStart, 0, 0, startW, startH);
+      this.drawImageContain(ASSETS.autoClose, 0, 0, closeW, closeH);
       ctx.restore();
-      this.hit(startX - startW / 2 - 8, startY - startH / 2 - 8, startW + 16, startH + 16, () => this.startAuto(this.autoSelectedCount), 'auto-start');
+      this.hit(closeX - closeW / 2 - 10, closeY - closeH / 2 - 10, closeW + 20, closeH + 20, () => this.closeOverlay(), 'auto-close');
     }
 
     drawPaytableOverlay() {
