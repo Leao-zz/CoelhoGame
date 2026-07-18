@@ -16,7 +16,7 @@
   const AUTO_STOP_MIN = 1600;
   const AUTO_STOP_MAX = 3200;
   const AUTO_STOP_STEP = 100;
-  const ASSET_VERSION = '24';
+  const ASSET_VERSION = '25';
   const WIN_TIER_CONFIG = Object.freeze({
     small: {
       minRatio: 0, maxRatio: 2, label: 'GANHO', settle: 220, lineDuration: 650,
@@ -2256,81 +2256,136 @@
       const scale = (isMega ? 0.62 : 0.7) + entry * (isMega ? 0.38 : 0.3);
       const pulse = 1 + Math.sin(time * (isMega ? 0.0075 : 0.0065)) * (isMega ? 0.022 : 0.014);
       const burst = 1 - clamp(finalElapsed / (isMega ? 1250 : 950), 0, 1);
-      const particleCount = isMega ? 18 : 12;
+      const artWidth = isMega ? 610 : 570;
+      const artHeight = isMega ? 500 : 400;
+      const artScale = scale * pulse;
+      const particleCount = isMega ? 24 : 16;
 
       ctx.save();
-      ctx.globalAlpha = appear;
-
-      // Vinheta escura no formato dos três rolos. Mantém cenário intacto e
-      // elimina competição visual dos símbolos atrás da placa de celebração.
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(31, 449);
-      ctx.lineTo(275, 449);
-      ctx.lineTo(275, 403);
-      ctx.lineTo(506, 403);
-      ctx.lineTo(506, 449);
-      ctx.lineTo(749, 449);
-      ctx.lineTo(749, 1205);
-      ctx.lineTo(31, 1205);
-      ctx.closePath();
-      ctx.clip();
-      const veil = ctx.createRadialGradient(cx, cy, 105, cx, cy, 520);
-      veil.addColorStop(0, isMega ? 'rgba(20,5,34,0.36)' : 'rgba(20,8,20,0.4)');
-      veil.addColorStop(0.48, isMega ? 'rgba(11,3,26,0.63)' : 'rgba(12,5,17,0.64)');
-      veil.addColorStop(1, 'rgba(3,2,10,0.78)');
-      ctx.fillStyle = veil;
-      ctx.fillRect(20, 395, 740, 820);
-      ctx.restore();
-
       ctx.translate(cx, cy);
 
-      // Clarão circular e raios curtos, restritos à área dos rolos.
-      const glowRadius = isMega ? 300 : 250;
+      // Halo orgânico local. Não existe mais retângulo preto sobre os rolos:
+      // o centro escuro termina suavemente poucos pixels além da própria arte.
+      const glowRadius = isMega ? 342 : 300;
       const glow = ctx.createRadialGradient(0, 0, 18, 0, 0, glowRadius);
-      glow.addColorStop(0, isMega ? `rgba(255,119,218,${0.38 + burst * 0.24})` : `rgba(255,224,100,${0.34 + burst * 0.2})`);
-      glow.addColorStop(0.48, isMega ? 'rgba(255,82,181,0.14)' : 'rgba(255,96,45,0.13)');
-      glow.addColorStop(1, 'rgba(255,170,30,0)');
+      glow.addColorStop(0, isMega ? 'rgba(36,5,49,0.62)' : 'rgba(35,9,18,0.58)');
+      glow.addColorStop(0.54, isMega ? 'rgba(24,4,42,0.42)' : 'rgba(28,7,20,0.4)');
+      glow.addColorStop(0.82, isMega ? 'rgba(235,58,187,0.11)' : 'rgba(255,142,43,0.1)');
+      glow.addColorStop(1, 'rgba(8,2,18,0)');
       ctx.fillStyle = glow;
-      ctx.fillRect(-glowRadius, -glowRadius, glowRadius * 2, glowRadius * 2);
+      ctx.globalAlpha = appear;
+      ctx.beginPath();
+      ctx.ellipse(0, 2, glowRadius, isMega ? 264 : 214, 0, 0, TAU);
+      ctx.fill();
 
+      // Explosão dourada no Grande; explosão rosa/dourada mais ampla no Mega.
       ctx.save();
       ctx.rotate(time * (isMega ? 0.00009 : -0.000065));
-      ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = isMega ? 'rgba(255,194,246,0.22)' : 'rgba(255,229,138,0.2)';
-      const rayCount = isMega ? 16 : 12;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = appear * (0.3 + burst * 0.5);
+      const rayCount = isMega ? 24 : 16;
       for (let ray = 0; ray < rayCount; ray += 1) {
         ctx.rotate(TAU / rayCount);
+        const rayLength = (isMega ? 295 : 250) + burst * (isMega ? 62 : 42);
+        const rayWidth = isMega && ray % 2 === 0 ? 8 : 5;
         ctx.beginPath();
-        ctx.moveTo(58, -3);
-        ctx.lineTo((isMega ? 278 : 230) + burst * 55, -10 - burst * 4);
-        ctx.lineTo((isMega ? 278 : 230) + burst * 55, 10 + burst * 4);
+        ctx.moveTo(isMega ? 92 : 80, -2);
+        ctx.lineTo(rayLength, -rayWidth);
+        ctx.lineTo(rayLength, rayWidth);
         ctx.closePath();
+        ctx.fillStyle = isMega && ray % 3 === 0 ? '#ff79db' : ray % 2 === 0 ? '#fff2a4' : '#ffae35';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = isMega ? 18 : 12;
         ctx.fill();
       }
       ctx.restore();
 
-      // Pequena explosão de partículas; no Mega há mais pontos e alternância rosa/dourada.
+      // Ondas de choque. Grande recebe um pulso; Mega recebe dois pulsos
+      // alternados para comunicar uma categoria de prêmio mais rara.
+      const waveCount = isMega ? 2 : 1;
+      for (let wave = 0; wave < waveCount; wave += 1) {
+        const delay = wave * 360;
+        const waveProgress = clamp((finalElapsed - delay) / (isMega ? 1050 : 820), 0, 1);
+        if (waveProgress <= 0 || waveProgress >= 1) continue;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * (1 - waveProgress) * (isMega ? 0.82 : 0.68);
+        ctx.strokeStyle = isMega && wave % 2 === 0 ? '#ff78db' : '#ffd45c';
+        ctx.lineWidth = isMega ? 7 : 6;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.shadowBlur = isMega ? 24 : 18;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 135 + waveProgress * (isMega ? 218 : 175), 92 + waveProgress * (isMega ? 150 : 108), 0, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Partículas determinísticas: não tremem entre quadros. O Grande usa
+      // faíscas quentes; o Mega mistura energia rosa, ouro e pequenos pétalas.
       for (let index = 0; index < particleCount; index += 1) {
         const angle = (index / particleCount) * TAU + (isMega ? 0.2 : 0.05);
         const travel = clamp(finalElapsed / (isMega ? 1050 : 820), 0, 1);
-        const radius = (isMega ? 115 : 95) + travel * (isMega ? 190 : 145) + Math.sin(time * 0.004 + index) * 9;
+        const radius = (isMega ? 118 : 98) + travel * (isMega ? 205 : 155) + Math.sin(time * 0.004 + index) * 9;
         const x = Math.cos(angle) * radius;
         const y = Math.sin(angle) * radius * 0.68;
         const size = (isMega ? 5.5 : 4.2) + Math.sin(time * 0.011 + index * 1.7) * 1.6;
+        ctx.save();
+        ctx.globalAlpha = appear * (0.42 + burst * 0.58);
+        ctx.globalCompositeOperation = 'lighter';
         ctx.beginPath();
         ctx.arc(x, y, Math.max(2, size), 0, TAU);
         ctx.fillStyle = isMega && index % 3 === 0 ? '#ff91df' : index % 2 === 0 ? '#fff2a4' : '#ffb43e';
         ctx.shadowColor = ctx.fillStyle;
         ctx.shadowBlur = isMega ? 16 : 11;
         ctx.fill();
+        ctx.restore();
       }
 
+      if (isMega) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = appear * (0.36 + burst * 0.42);
+        for (let petal = 0; petal < 12; petal += 1) {
+          const angle = petal * (TAU / 12) + time * 0.00012;
+          const drift = 200 + ((petal * 37) % 95) + Math.sin(time * 0.002 + petal) * 18;
+          ctx.save();
+          ctx.translate(Math.cos(angle) * drift, Math.sin(angle) * drift * 0.72);
+          ctx.rotate(angle + Math.PI / 2);
+          ctx.fillStyle = petal % 2 ? '#ffb8e8' : '#ff6fcf';
+          ctx.shadowColor = '#ff69cc';
+          ctx.shadowBlur = 13;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 4.5, 11, 0, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.restore();
+      }
+
+      // A sombra escura e o neon usam o canal alpha da imagem. Assim a borda
+      // acompanha o arabesco da placa, sem qualquer caixa preta quadrada.
       ctx.save();
-      ctx.scale(scale * pulse, scale * pulse);
+      ctx.scale(artScale * 1.045, artScale * 1.045);
+      ctx.globalAlpha = appear * (isMega ? 0.74 : 0.68);
+      ctx.filter = `brightness(0) blur(${isMega ? 17 : 14}px)`;
+      this.drawImageContain(artwork, 0, 0, artWidth, artHeight);
+      ctx.restore();
+
+      ctx.save();
+      ctx.scale(artScale, artScale);
+      ctx.globalAlpha = appear * (isMega ? 0.34 : 0.26);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowColor = isMega ? '#ff55ce' : '#ffc341';
+      ctx.shadowBlur = isMega ? 54 + burst * 34 : 40 + burst * 26;
+      this.drawImageContain(artwork, 0, 0, artWidth, artHeight);
+      ctx.restore();
+
+      ctx.save();
+      ctx.scale(artScale, artScale);
+      ctx.globalAlpha = appear;
       ctx.shadowColor = isMega ? '#ff66d2' : '#ffc94c';
       ctx.shadowBlur = isMega ? 42 + burst * 28 : 32 + burst * 22;
-      this.drawImageContain(artwork, 0, 0, isMega ? 610 : 570, isMega ? 500 : 400);
+      this.drawImageContain(artwork, 0, 0, artWidth, artHeight);
       ctx.restore();
       ctx.restore();
     }
