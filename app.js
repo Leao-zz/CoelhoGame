@@ -3,6 +3,8 @@
 
   const W = 780;
   const H = 1688;
+  const BASE_CANVAS_W = 1166;
+  const BASE_CANVAS_H = 2434;
   const TAU = Math.PI * 2;
   const money = (value) => `R$${value.toFixed(2).replace('.', ',')}`;
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -18,7 +20,30 @@
   const AUTO_STOP_MIN = 1600;
   const AUTO_STOP_MAX = 3200;
   const AUTO_STOP_STEP = 100;
+  const FEATURE_SPINS = 8;
+  const FEATURE_MAX_MULTIPLIER = 5000;
+  const FEATURE_INTRO_DURATION = 2600;
+  const FEATURE_OUTRO_DURATION = 3200;
   const ASSET_VERSION = '27';
+  const getPerformanceProfile = () => {
+    const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const saveData = Boolean(navigator.connection?.saveData);
+    const deviceMemory = Number(navigator.deviceMemory) || 0;
+    const cpuCount = Number(navigator.hardwareConcurrency) || 0;
+    const constrained = saveData
+      || reducedMotion
+      || (deviceMemory > 0 && deviceMemory <= 4)
+      || (cpuCount > 0 && cpuCount <= 4);
+    const lowPower = coarsePointer && constrained;
+    return Object.freeze({
+      mobile: coarsePointer,
+      lowPower,
+      targetFps: lowPower ? 30 : 60,
+      pixelRatioCap: lowPower ? 1.35 : coarsePointer ? 2 : 2.25,
+      particleScale: lowPower ? 0.5 : 1,
+    });
+  };
   const WIN_TIER_CONFIG = Object.freeze({
     small: {
       minRatio: 0, maxRatio: 2, label: 'GANHO', settle: 220, lineDuration: 650,
@@ -42,7 +67,14 @@
     },
   });
 
-  const { PAYLINES, SYMBOLS, FEATURE_TRIGGER_RATE, evaluateGrid, makeMixedWinGrid } = window.CoelhoMath;
+  const {
+    PAYLINES,
+    SYMBOLS,
+    FEATURE_TRIGGER_RATE,
+    evaluateGrid,
+    applyFeatureWin,
+    makeMixedWinGrid,
+  } = window.CoelhoMath;
   const REEL_LAYOUT = [
     { x: 31, y: 449, w: 229, h: 704, rows: 3, cellH: 234.67 },
     { x: 275, y: 403, w: 231, h: 802, rows: 4, cellH: 200.5 },
@@ -53,6 +85,16 @@
     right: [2, 4, 1, 6, 8, 3, 5, 10, 7, 9],
   };
   const LINE_RAIL_Y = [507, 565, 623, 713, 770, 828, 886, 992, 1050, 1108];
+  const REEL_STOP_TIMES = [900, 1190, 1480];
+  const PAYLINE_RAIL_POINTS = Object.freeze(Array.from({ length: 10 }, (_, index) => {
+    const lineNumber = index + 1;
+    return Object.freeze({
+      left: Object.freeze({ x: 22, y: LINE_RAIL_Y[LINE_RAILS.left.indexOf(lineNumber)] }),
+      right: Object.freeze({ x: 758, y: LINE_RAIL_Y[LINE_RAILS.right.indexOf(lineNumber)] }),
+    });
+  }));
+  const IDLE_FRAME_SEQUENCE = Object.freeze([1, 2, 3, 4, 5, 4, 3, 2]);
+  const CELEBRATION_FRAME_KEYS = Object.freeze(['celebration1', 'celebration2', 'celebration3', 'celebration4', 'celebration5']);
   // Pontos coincidentes com as estrelas já pintadas no céu. O brilho é
   // sobreposto no mesmo lugar para preservar a composição da arte original.
   const SKY_STAR_POINTS = Object.freeze([
@@ -114,24 +156,35 @@
 
   function loadAssets(onProgress = () => { }) {
     const entries = Object.entries(ASSET_PATHS);
+    const imagePromises = new Map();
     let loaded = 0;
     onProgress(loaded, entries.length);
-    return Promise.all(entries.map(([key, src]) => new Promise((resolve) => {
-      const image = new Image();
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timeout);
+    return Promise.all(entries.map(([key, src]) => {
+      let promise = imagePromises.get(src);
+      if (!promise) {
+        promise = new Promise((resolve) => {
+          const image = new Image();
+          let finished = false;
+          const finish = (loadedImage = null) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timeout);
+            resolve(loadedImage);
+          };
+          const timeout = setTimeout(finish, 6000);
+          image.decoding = 'async';
+          image.onload = () => finish(image);
+          image.onerror = () => finish();
+          image.src = `${src}?v=${ASSET_VERSION}`;
+        });
+        imagePromises.set(src, promise);
+      }
+      return promise.then((image) => {
+        if (image) ASSETS[key] = image;
         loaded += 1;
         onProgress(loaded, entries.length);
-        resolve();
-      };
-      const timeout = setTimeout(finish, 6000);
-      image.onload = () => { ASSETS[key] = image; finish(); };
-      image.onerror = finish;
-      image.src = `${src}?v=${ASSET_VERSION}`;
-    })));
+      });
+    }));
   }
   const PANEL_TIPS = [
     { text: 'SÍMBOLOS DE PRÊMIO PAGAM ATÉ 500x!', mode: 'scroll', duration: 3400 },
@@ -326,6 +379,25 @@
       this.noise(0.32, big ? 0.12 : 0.075, 2200, 0.04);
     }
 
+    featureStart() {
+      [392, 523, 659, 784].forEach((frequency, index) => {
+        this.tone(frequency, 0.42, 0.13, 'triangle', index * 0.11);
+      });
+      this.noise(0.48, 0.07, 2400, 0.08);
+    }
+
+    featureCollect(index = 0) {
+      const base = 740 + Math.min(7, index) * 44;
+      this.tone(base, 0.15, 0.105, 'sine');
+      this.tone(base * 1.34, 0.18, 0.08, 'triangle', 0.055);
+    }
+
+    featureEnd(maximum = false) {
+      const notes = maximum ? [523, 659, 784, 1047, 1319] : [440, 554, 659, 880];
+      notes.forEach((frequency, index) => this.tone(frequency, 0.44, maximum ? 0.15 : 0.11, 'triangle', index * 0.09));
+      this.noise(maximum ? 0.7 : 0.42, maximum ? 0.1 : 0.065, 2600, 0.08);
+    }
+
     playWinTier(tier) {
       if (!this.effectsEnabled) return;
       const soundKey = tier === 'max'
@@ -348,7 +420,8 @@
   class Game {
     constructor(canvas) {
       this.canvas = canvas;
-      this.ctx = canvas.getContext('2d', { alpha: false });
+      this.performanceProfile = getPerformanceProfile();
+      this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
       this.sound = new SoundEngine();
       this.state = 'IDLE';
       this.balance = 250;
@@ -364,6 +437,13 @@
       this.autoStopAmount = AUTO_STOP_MIN;
       this.featureRemaining = 0;
       this.featureTotal = 0;
+      this.featureBet = 0;
+      this.featureMaximum = 0;
+      this.featureSpinIndex = 0;
+      this.featureRoundStartTotal = 0;
+      this.featureRoundWin = 0;
+      this.featureCollectStart = 0;
+      this.featureLimitReached = false;
       this.featureIntroStart = 0;
       this.featureOutroStart = 0;
       this.activeFeatureSpin = false;
@@ -429,13 +509,106 @@
       this.tickerStarted = performance.now();
       this.tickerDuration = PANEL_DEFAULT_DURATION;
       this.tickerAlpha = 0;
+      this.tickerSwapStarted = 0;
+      this.tickerAccent = 'normal';
       this.tickerX = PANEL_X + PANEL_W + 12;
       this.tickerWidth = 0;
       this.paylinePreviewStart = 0;
       this.paylinePreviewUntil = 0;
       this.renderTime = performance.now();
+      this.lastFrameDraw = 0;
+      this.frameBound = this.frame.bind(this);
+      this.resizeTimer = 0;
+      this.cachedWinResult = null;
+      this.cachedWinSteps = [];
+      this.cachedWinTiming = null;
+      this.cachedWinTimingTier = '';
+      this.activeWinCells = [];
+      this.activeWinCellFlags = new Uint8Array(12);
+      this.winningLineFlags = new Uint8Array(11);
+      this.controlDefinitions = this.createControlDefinitions();
+      this.spinControlAction = this.handleSpinControl.bind(this);
+      this.starGlowSprite = this.createRadialSprite(64, [
+        [0, 'rgba(255,255,225,1)'],
+        [0.28, 'rgba(255,221,116,0.48)'],
+        [1, 'rgba(255,198,76,0)'],
+      ]);
+      this.dustGlowSprite = this.createRadialSprite(48, [
+        [0, 'rgba(255,248,194,1)'],
+        [0.35, 'rgba(255,210,92,0.58)'],
+        [1, 'rgba(255,190,62,0)'],
+      ]);
+      this.mistGlowSprite = this.createRadialSprite(64, [
+        [0, 'rgba(255,245,222,0.075)'],
+        [1, 'rgba(255,245,222,0)'],
+      ]);
+      this.coinSprites = new Map();
+      this.resizeCanvas();
       this.activatePanelItem(PANEL_TIPS[0], performance.now());
       this.bind();
+      window.addEventListener('resize', () => {
+        clearTimeout(this.resizeTimer);
+        this.resizeTimer = window.setTimeout(() => this.resizeCanvas(), 120);
+      }, { passive: true });
+      document.addEventListener('visibilitychange', () => {
+        this.lastTime = performance.now();
+        this.lastFrameDraw = 0;
+      }, { passive: true });
+    }
+
+    createRadialSprite(size, stops) {
+      const sprite = document.createElement('canvas');
+      sprite.width = size;
+      sprite.height = size;
+      const spriteCtx = sprite.getContext('2d', { alpha: true });
+      const center = size / 2;
+      const gradient = spriteCtx.createRadialGradient(center, center, 0, center, center, center);
+      stops.forEach(([offset, color]) => gradient.addColorStop(offset, color));
+      spriteCtx.fillStyle = gradient;
+      spriteCtx.fillRect(0, 0, size, size);
+      return sprite;
+    }
+
+    getCoinSprite(accent) {
+      if (this.coinSprites.has(accent)) return this.coinSprites.get(accent);
+      const sprite = document.createElement('canvas');
+      const spriteSize = 128;
+      const radius = 54;
+      sprite.width = spriteSize;
+      sprite.height = spriteSize;
+      const spriteCtx = sprite.getContext('2d', { alpha: true });
+      spriteCtx.translate(spriteSize / 2, spriteSize / 2);
+      const face = spriteCtx.createRadialGradient(-radius * 0.28, -radius * 0.32, 1, 0, 0, radius);
+      face.addColorStop(0, '#fff5a6');
+      face.addColorStop(0.38, accent);
+      face.addColorStop(1, '#b95a0d');
+      spriteCtx.fillStyle = face;
+      spriteCtx.strokeStyle = '#fff0a0';
+      spriteCtx.lineWidth = 7;
+      spriteCtx.beginPath();
+      spriteCtx.arc(0, 0, radius, 0, TAU);
+      spriteCtx.fill();
+      spriteCtx.stroke();
+      spriteCtx.rotate(Math.PI / 4);
+      spriteCtx.fillStyle = '#7c3514';
+      spriteCtx.fillRect(-11, -11, 22, 22);
+      spriteCtx.strokeStyle = '#ffd76a';
+      spriteCtx.lineWidth = 5;
+      spriteCtx.strokeRect(-11, -11, 22, 22);
+      this.coinSprites.set(accent, sprite);
+      return sprite;
+    }
+
+    resizeCanvas() {
+      const cssWidth = this.canvas.getBoundingClientRect().width || window.innerWidth || BASE_CANVAS_W;
+      const deviceRatio = Math.min(window.devicePixelRatio || 1, this.performanceProfile.pixelRatioCap);
+      const targetWidth = this.performanceProfile.mobile
+        ? clamp(Math.round(cssWidth * deviceRatio), 520, BASE_CANVAS_W)
+        : BASE_CANVAS_W;
+      const targetHeight = Math.round(targetWidth * BASE_CANVAS_H / BASE_CANVAS_W);
+      if (this.canvas.width === targetWidth && this.canvas.height === targetHeight) return;
+      this.canvas.width = targetWidth;
+      this.canvas.height = targetHeight;
     }
 
     get lineStake() {
@@ -451,11 +624,15 @@
     }
 
     randomStrip(length, feature = false) {
-      return Array.from({ length }, () => this.randomSymbol(feature));
+      return Array.from({ length }, () => {
+        const type = this.randomSymbol(feature);
+        const prize = type === 'prize' ? this.randomPrize() : 0;
+        return { type, prize, prizeAmount: prize * this.spinBet };
+      });
     }
 
-    makeGrid(feature = false) {
-      return this.freezePrizeValues(window.CoelhoMath.makeGrid(feature), this.bet);
+    makeGrid(feature = false, bet = this.bet) {
+      return this.freezePrizeValues(window.CoelhoMath.makeGrid(feature), bet);
     }
 
     freezePrizeValues(grid, bet = this.bet) {
@@ -523,13 +700,21 @@
             return;
           }
         }
-        const target = [...this.hitAreas].reverse().find((area) => p.x >= area.x && p.x <= area.x + area.w && p.y >= area.y && p.y <= area.y + area.h);
+        let target = null;
+        for (let index = this.hitAreas.length - 1; index >= 0; index -= 1) {
+          const area = this.hitAreas[index];
+          if (p.x >= area.x && p.x <= area.x + area.w && p.y >= area.y && p.y <= area.y + area.h) {
+            target = area;
+            break;
+          }
+        }
         if (target) {
           this.sound.ready();
+          const autoWasActive = this.autoActive;
           this.buttonPress = { id: target.id || 'generic', x: p.x, y: p.y, started: performance.now(), until: performance.now() + 190 };
           if (this.autoActive && target.id !== 'turbo') this.stopAuto('RODADA AUTOMÁTICA PARADA');
           this.sound.button(target.id === 'spin' ? 'spin' : target.id === 'turbo' ? 'turbo' : 'button');
-          target.action();
+          target.action(autoWasActive);
         }
         else if (this.overlay) this.dragStart = { y: p.y, scroll: this.overlayScroll };
         else if (this.state === 'SPIN_LOOP') {
@@ -567,15 +752,26 @@
     }
 
     start() {
-      requestAnimationFrame((time) => this.frame(time));
+      requestAnimationFrame(this.frameBound);
     }
 
     frame(time) {
+      if (document.hidden) {
+        this.lastTime = time;
+        requestAnimationFrame(this.frameBound);
+        return;
+      }
+      const frameInterval = 1000 / this.performanceProfile.targetFps;
+      if (this.lastFrameDraw && time - this.lastFrameDraw < frameInterval - 0.5) {
+        requestAnimationFrame(this.frameBound);
+        return;
+      }
       const dt = Math.min(40, time - this.lastTime);
       this.lastTime = time;
+      this.lastFrameDraw = time;
       this.update(time, dt);
       this.draw(time);
-      requestAnimationFrame((next) => this.frame(next));
+      requestAnimationFrame(this.frameBound);
     }
 
     update(time, dt) {
@@ -583,26 +779,33 @@
       this.updateOverlayTransition(time);
       if (this.state === 'SPIN_LOOP') this.spinButtonAngle = (this.spinButtonAngle + dt * (this.turbo ? 0.0095 : 0.0064)) % TAU;
       this.updateTicker(time, dt);
-      this.particles = this.particles.filter((particle) => {
+      let particleWrite = 0;
+      for (let index = 0; index < this.particles.length; index += 1) {
+        const particle = this.particles[index];
         particle.life -= dt;
         particle.x += particle.vx * dt;
         particle.y += particle.vy * dt;
         particle.vy += 0.0008 * dt;
         particle.rotation += particle.spin * dt;
-        return particle.life > 0;
-      });
-      this.moneyTransfers = this.moneyTransfers.filter((transfer) => time - transfer.started < transfer.duration + 260);
+        if (particle.life > 0) this.particles[particleWrite++] = particle;
+      }
+      this.particles.length = particleWrite;
+      let transferWrite = 0;
+      for (let index = 0; index < this.moneyTransfers.length; index += 1) {
+        const transfer = this.moneyTransfers[index];
+        if (time - transfer.started < transfer.duration + 260) this.moneyTransfers[transferWrite++] = transfer;
+      }
+      this.moneyTransfers.length = transferWrite;
 
       if (this.state === 'SPIN_LOOP') {
         const elapsed = time - this.spinStart;
         const durationScale = this.turbo ? 0.48 : 1;
-        const stops = [900, 1190, 1480].map((value) => value * durationScale);
         this.reels.forEach((reel, index) => {
           if (reel.stopped) return;
           const acceleration = clamp(elapsed / (180 * durationScale), 0, 1);
           reel.speed = lerp(0.45, this.turbo ? 3.25 : 2.35, acceleration);
           reel.offset = (reel.offset + reel.speed * dt) % reel.cellH;
-          if (elapsed >= stops[index]) this.stopReel(reel, time);
+          if (elapsed >= REEL_STOP_TIMES[index] * durationScale) this.stopReel(reel, time);
         });
         if (this.reels.every((reel) => reel.stopped)) this.finishSpin(time);
       }
@@ -620,7 +823,8 @@
         }
         if (!phase.settling && !phase.showAll && phase.index !== this.lastLineSoundIndex) {
           this.lastLineSoundIndex = phase.index;
-          this.sound.lineWin(phase.index);
+          if (this.activeFeatureSpin) this.sound.featureCollect(phase.index);
+          else this.sound.lineWin(phase.index);
           this.launchWinTransfer(this.getWinSteps()[phase.index], time);
         }
         const accounting = this.getWinAccounting(time);
@@ -634,15 +838,23 @@
         this.advanceAfterResult(time);
       }
 
-      if (this.state === 'FEATURE_INTRO' && time - this.featureIntroStart > 2300) {
+      if (this.state === 'FEATURE_INTRO' && time - this.featureIntroStart > FEATURE_INTRO_DURATION) {
         this.state = 'IDLE';
-        this.message = 'RODADAS DA FORTUNA 8';
+        this.message = `RODADAS DA FORTUNA ${FEATURE_SPINS}`;
         setTimeout(() => this.spin(), 220);
       }
 
-      if (this.state === 'FEATURE_OUTRO' && time - this.featureOutroStart > 3000) {
+      if (this.state === 'FEATURE_OUTRO' && time - this.featureOutroStart > FEATURE_OUTRO_DURATION) {
         this.state = 'IDLE';
         this.message = 'BOA SORTE!';
+        this.checkAutoLimits(this.featureTotal);
+        const resumeAuto = this.autoActive && this.autoRemaining > 0;
+        this.activeFeatureSpin = false;
+        this.featureBet = 0;
+        this.featureSpinIndex = 0;
+        if (resumeAuto) setTimeout(() => {
+          if (this.state === 'IDLE' && this.autoActive && this.autoRemaining > 0) this.spin();
+        }, this.turbo ? 140 : 460);
       }
     }
 
@@ -660,6 +872,7 @@
     }
 
     getWinSteps() {
+      if (this.cachedWinResult === this.result) return this.cachedWinSteps;
       const steps = this.result.lines.map((line) => ({
         kind: 'line',
         index: line.index,
@@ -674,10 +887,17 @@
           cells: [{ c: prize.c, r: prize.r }],
         }));
       }
-      return steps;
+      this.cachedWinResult = this.result;
+      this.cachedWinSteps = steps;
+      this.cachedWinTiming = null;
+      return this.cachedWinSteps;
     }
 
     getWinTiming() {
+      const timingTier = `${this.winTier}:${this.turbo}`;
+      if (this.cachedWinTiming && this.cachedWinResult === this.result && this.cachedWinTimingTier === timingTier) {
+        return this.cachedWinTiming;
+      }
       const config = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.small;
       const steps = this.getWinSteps();
       const count = steps.length;
@@ -693,9 +913,10 @@
       const rawStepTotal = steps.reduce((sum, step) => sum + step.amount, 0);
       const extraAmount = Math.max(0, this.result.total - Math.min(this.result.total, rawStepTotal));
       const finalDuration = this.turbo ? 520 : config.finalHold;
-      const transferStart = stepEnd + Math.max(this.turbo ? 120 : 320, finalDuration * 0.34);
       const transferDuration = this.turbo ? 240 : Math.min(760, finalDuration * 0.42);
-      return {
+      const transferStart = stepEnd + finalDuration - transferDuration;
+      this.cachedWinTimingTier = timingTier;
+      this.cachedWinTiming = {
         baseSettleDuration,
         categoryIntroDuration,
         settleDuration,
@@ -708,14 +929,15 @@
         transferDuration,
         totalDuration: stepEnd + finalDuration,
       };
+      return this.cachedWinTiming;
     }
 
     getWinAccounting(time = this.renderTime) {
       if (this.lastWin <= 0 || !this.result.total) {
-        return { counted: 0, gain: 0, balance: this.balance, transferProgress: 1 };
+        return { counted: 0, gain: 0, balance: this.balance, transferProgress: 1, transferred: 0 };
       }
       if (this.winCredited) {
-        return { counted: this.lastWin, gain: this.lastWin, balance: this.balance, transferProgress: 1 };
+        return { counted: 0, gain: 0, balance: this.balance, transferProgress: 1, transferred: this.lastWin };
       }
       const timing = this.getWinTiming();
       const elapsed = Math.max(0, time - this.winStart);
@@ -723,7 +945,7 @@
       const stepScale = timing.rawStepTotal > this.result.total ? this.result.total / timing.rawStepTotal : 1;
       const minimumWin = Math.min(
         this.result.total,
-        ...steps.map((step) => step.amount * stepScale),
+        steps.reduce((minimum, step) => Math.min(minimum, step.amount * stepScale), this.result.total),
       );
       let countedFromZero = 0;
       steps.forEach((step, index) => {
@@ -740,11 +962,16 @@
       const counted = minimumWin + (this.result.total - minimumWin) * zeroProgress;
       const transferProgress = clamp((elapsed - timing.transferStart) / timing.transferDuration, 0, 1);
       const easedTransfer = transferProgress * transferProgress * (3 - 2 * transferProgress);
+      const transferred = this.result.total * easedTransfer;
+      const visibleWin = transferProgress > 0
+        ? Math.max(0, this.result.total - transferred)
+        : counted;
       return {
-        counted,
-        gain: counted,
-        balance: this.balance + this.result.total * easedTransfer,
+        counted: visibleWin,
+        gain: visibleWin,
+        balance: this.balance + transferred,
         transferProgress,
+        transferred,
       };
     }
 
@@ -753,15 +980,19 @@
       this.balance += this.lastWin;
       this.winCredited = true;
       this.balancePulseStart = performance.now();
-      this.checkAutoLimits();
+      if (!this.activeFeatureSpin && !this.pendingFeature && this.featureRemaining === 0) this.checkAutoLimits();
     }
 
     activatePanelItem(item, time) {
+      const preserveAlpha = Boolean(item.preserveAlpha);
+      const previousAlpha = this.tickerAlpha;
       this.tickerText = item.text;
       this.tickerMode = item.mode || 'center';
-      this.tickerStarted = time;
+      this.tickerStarted = preserveAlpha ? time - 420 : time;
       this.tickerDuration = item.duration ? item.duration * 1.6 : PANEL_DEFAULT_DURATION;
-      this.tickerAlpha = 0;
+      this.tickerAlpha = preserveAlpha ? Math.max(previousAlpha, 0.92) : 0;
+      this.tickerSwapStarted = preserveAlpha ? time : 0;
+      this.tickerAccent = item.accent || 'normal';
       this.tickerX = PANEL_X + PANEL_W + 12;
       this.ctx.save();
       this.ctx.font = '900 29px Arial Black, Arial';
@@ -774,10 +1005,10 @@
       this.panelQueue.push({ text, mode, duration });
     }
 
-    showPanelNow(text, mode = 'center', duration = 3200) {
+    showPanelNow(text, mode = 'center', duration = 3200, options = {}) {
       if (!text) return;
       this.panelQueue = this.panelQueue.filter((item) => !item.text.startsWith('APOSTA '));
-      this.activatePanelItem({ text, mode, duration }, performance.now());
+      this.activatePanelItem({ text, mode, duration, ...options }, performance.now());
     }
 
     advancePanel(time) {
@@ -811,8 +1042,15 @@
       this.enqueuePanel(`10 LINHAS ATIVAS • APOSTA ${money(this.bet)}`, 'center', 3000);
     }
 
+    isFortuneActive() {
+      return this.pendingFeature
+        || this.activeFeatureSpin
+        || this.featureRemaining > 0
+        || this.state.startsWith('FEATURE_');
+    }
+
     adjustBetLevel(direction) {
-      if (this.state !== 'IDLE') return;
+      if (this.state !== 'IDLE' || this.isFortuneActive()) return;
       const nextLevel = clamp(this.level + direction, 1, 10);
       this.level = nextLevel;
       const message = nextLevel === 10
@@ -821,7 +1059,8 @@
           ? `APOSTA MÍNIMA • ${money(this.bet)}`
           : `APOSTA ${nextLevel} • ${money(this.bet)}`;
       this.message = message;
-      this.showPanelNow(message, 'center', 2600);
+      const accent = nextLevel === 10 ? 'bet-max' : nextLevel === 1 ? 'bet-min' : 'bet';
+      this.showPanelNow(message, 'center', 2600, { preserveAlpha: true, accent });
     }
 
     getPaylinePreview(time) {
@@ -842,19 +1081,19 @@
       if (this.pendingFeature) {
         this.pendingFeature = false;
         this.featureIntroStart = time;
-        this.featureTotal = 0;
         this.state = 'FEATURE_INTRO';
-        this.sound.win(true);
+        this.sound.featureStart();
         this.burst(W / 2, 720, 100, '#ffd44d');
         return;
       }
-      if (this.activeFeatureSpin && this.featureRemaining === 0) {
+      if (this.activeFeatureSpin && (this.featureRemaining === 0 || this.featureLimitReached)) {
         this.activeFeatureSpin = false;
+        this.featureRemaining = 0;
         this.featureOutroStart = time;
         this.state = 'FEATURE_OUTRO';
         this.message = `TOTAL ${money(this.featureTotal)}`;
         this.enqueuePanel(`TOTAL DA FORTUNA ${money(this.featureTotal)}`, 'center', 3800);
-        this.sound.win(true);
+        this.sound.featureEnd(this.featureLimitReached);
         this.burst(W / 2, 780, 120, '#ffd44d');
         this.coinRain(110);
         return;
@@ -878,14 +1117,18 @@
         this.enqueuePanel(this.message, 'center', 3200);
         return;
       }
-      this.spinBet = this.bet;
+      this.spinBet = featureSpin ? (this.featureBet || this.bet) : this.bet;
       if (!featureSpin) this.balance -= this.spinBet;
-      else this.featureRemaining -= 1;
+      else {
+        this.featureRemaining -= 1;
+        this.featureSpinIndex += 1;
+        this.featureRoundStartTotal = this.featureTotal;
+      }
       this.activeFeatureSpin = featureSpin;
       if (!featureSpin && this.autoRemaining > 0) this.autoRemaining -= 1;
       this.lastWin = 0;
       this.result = { total: 0, lines: [], cells: [], prizes: [] };
-      this.grid = featureSpin ? this.makeGrid(true) : this.makeShowcaseGrid();
+      this.grid = featureSpin ? this.makeGrid(true, this.spinBet) : this.makeShowcaseGrid();
       if (this.forceLines && !featureSpin) {
         this.grid = [3, 4, 3].map((rows) => Array.from({ length: rows }, () => ({ type: 'rockets', prize: 0 })));
       }
@@ -972,9 +1215,18 @@
         this.result.total = target;
         this.forceWinTier = null;
       }
+      if (this.activeFeatureSpin) {
+        const accounting = applyFeatureWin(this.featureTotal, this.result.total, this.featureBet || this.spinBet);
+        this.result.total = accounting.awarded;
+        this.featureRoundWin = accounting.awarded;
+        this.featureTotal = accounting.total;
+        this.featureMaximum = accounting.maximum;
+        this.featureLimitReached = accounting.reachedMaximum;
+        this.featureCollectStart = time;
+        if (accounting.reachedMaximum) this.featureRemaining = 0;
+      }
       this.lastWin = this.result.total;
       this.winCredited = this.result.total <= 0;
-      if (this.activeFeatureSpin) this.featureTotal += this.result.total;
       this.winStart = time;
       this.lastLineSoundIndex = -1;
       this.winTier = this.getWinTier();
@@ -985,7 +1237,14 @@
       this.celebrateWin = this.winTier !== 'small';
 
       if (this.pendingFeature && this.featureRemaining === 0) {
-        this.featureRemaining = 8;
+        this.featureRemaining = FEATURE_SPINS;
+        this.featureTotal = 0;
+        this.featureBet = this.spinBet;
+        this.featureMaximum = FEATURE_MAX_MULTIPLIER * this.spinBet;
+        this.featureSpinIndex = 0;
+        this.featureRoundStartTotal = 0;
+        this.featureRoundWin = 0;
+        this.featureLimitReached = false;
         this.message = 'COELHO DA FORTUNA — 8 RODADAS!';
       }
 
@@ -1021,11 +1280,11 @@
       }
     }
 
-    checkAutoLimits() {
+    checkAutoLimits(singleWin = this.lastWin) {
       if (!this.autoRemaining) return;
       const lossReached = this.autoLimits.loss && this.balance <= this.autoStartBalance - this.autoLimits.loss;
       const gainReached = this.autoLimits.gain && this.balance >= this.autoStartBalance + this.autoLimits.gain;
-      const singleReached = this.autoLimits.single && this.lastWin >= this.autoLimits.single;
+      const singleReached = this.autoLimits.single && singleWin >= this.autoLimits.single;
       if (lossReached || gainReached || singleReached) {
         this.stopAuto('LIMITE DA RODADA AUTOMÁTICA ATINGIDO');
       }
@@ -1066,7 +1325,8 @@
 
     launchCelebrationConfetti(count) {
       const kinds = ['confetti', 'carrot', 'frd'];
-      for (let index = 0; index < count; index += 1) {
+      const scaledCount = Math.max(1, Math.round(count * this.performanceProfile.particleScale));
+      for (let index = 0; index < scaledCount; index += 1) {
         this.particles.push({
           x: 70 + Math.random() * (W - 140),
           y: 250 + Math.random() * 520,
@@ -1084,7 +1344,8 @@
     }
 
     burst(x, y, count, color) {
-      for (let index = 0; index < count; index += 1) {
+      const scaledCount = Math.max(1, Math.round(count * this.performanceProfile.particleScale));
+      for (let index = 0; index < scaledCount; index += 1) {
         const angle = Math.random() * TAU;
         const speed = 0.05 + Math.random() * 0.18;
         this.particles.push({
@@ -1097,7 +1358,7 @@
           rotation: Math.random() * TAU,
           spin: (Math.random() - 0.5) * 0.012,
           color,
-          kind: count >= 70 && index % 4 === 0 ? 'coin' : 'spark',
+          kind: scaledCount >= 35 && index % 4 === 0 ? 'coin' : 'spark',
         });
       }
     }
@@ -1120,9 +1381,9 @@
     drawMoneyTransfers(time) {
       const ctx = this.ctx;
       const targetX = 390;
-      const targetY = 1425;
+      const targetY = DISPLAY_Y + 82;
       this.moneyTransfers.forEach((transfer) => {
-        const count = this.turbo ? 6 : 10;
+        const count = this.performanceProfile.lowPower ? 4 : this.turbo ? 6 : 10;
         for (let index = 0; index < count; index += 1) {
           const delay = index * (this.turbo ? 22 : 38);
           const progress = clamp((time - transfer.started - delay) / Math.max(1, transfer.duration - delay), 0, 1);
@@ -1152,8 +1413,76 @@
       });
     }
 
+    drawWinBalanceTransfer(time) {
+      if (this.state !== 'WIN' || this.lastWin <= 0 || this.winCredited) return;
+      const accounting = this.getWinAccounting(time);
+      const progress = accounting.transferProgress;
+      if (progress <= 0 || progress >= 1) return;
+
+      const ctx = this.ctx;
+      const start = { x: PANEL_X + PANEL_W / 2, y: DISPLAY_Y + 84 };
+      const control = { x: 338, y: 1394 };
+      const end = { x: 226, y: 1428 };
+      const travelAlpha = Math.sin(progress * Math.PI);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = `rgba(255,226,91,${0.16 + travelAlpha * 0.24})`;
+      ctx.lineWidth = 5;
+      ctx.shadowColor = '#ffde54';
+      ctx.shadowBlur = 16;
+      ctx.setLineDash([12, 18]);
+      ctx.lineDashOffset = -time * 0.045;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.quadraticCurveTo(control.x, control.y, end.x, end.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const coinCount = this.performanceProfile.lowPower ? 4 : 8;
+      const coinSprite = this.getCoinSprite('#ffd94f');
+      for (let index = 0; index < coinCount; index += 1) {
+        const local = clamp(progress * 1.42 - index * 0.075, 0, 1);
+        if (local <= 0 || local >= 1) continue;
+        const eased = local * local * (3 - 2 * local);
+        const inverse = 1 - eased;
+        const x = inverse * inverse * start.x + 2 * inverse * eased * control.x + eased * eased * end.x;
+        const y = inverse * inverse * start.y + 2 * inverse * eased * control.y + eased * eased * end.y;
+        const alpha = clamp(local / 0.12, 0, 1) * clamp((1 - local) / 0.16, 0, 1);
+        const size = 16 + (index % 3) * 3;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x, y);
+        ctx.rotate(time * 0.008 + index * 1.7);
+        ctx.scale(1, 0.55 + Math.abs(Math.cos(local * TAU * 2)) * 0.45);
+        if (coinSprite) ctx.drawImage(coinSprite, -size, -size, size * 2, size * 2);
+        else {
+          ctx.fillStyle = '#ffd94f';
+          ctx.beginPath();
+          ctx.arc(0, 0, size, 0, TAU);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      const arrival = clamp((progress - 0.55) / 0.45, 0, 1);
+      if (arrival > 0) {
+        const glow = ctx.createRadialGradient(end.x, end.y, 4, end.x, end.y, 72);
+        glow.addColorStop(0, `rgba(255,248,176,${0.7 * arrival})`);
+        glow.addColorStop(0.35, `rgba(255,202,42,${0.42 * arrival})`);
+        glow.addColorStop(1, 'rgba(255,176,24,0)');
+        ctx.globalAlpha = Math.sin(arrival * Math.PI) * 0.9;
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(end.x, end.y, 72, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     coinRain(count = 70) {
-      for (let index = 0; index < count; index += 1) {
+      const scaledCount = Math.max(1, Math.round(count * this.performanceProfile.particleScale));
+      for (let index = 0; index < scaledCount; index += 1) {
         this.particles.push({
           x: 45 + Math.random() * (W - 90),
           y: -60 - Math.random() * 520,
@@ -1174,25 +1503,29 @@
       const ctx = this.ctx;
       this.renderTime = time;
       ctx.save();
-      ctx.scale(1166 / 780, 2434 / 1688);
-      ctx.clearRect(0, 0, 780, 1688);
-      this.hitAreas = [];
+      ctx.scale(this.canvas.width / W, this.canvas.height / H);
+      this.hitAreas.length = 0;
       this.drawBackground(time);
       this.drawHeader(time);
       this.drawReelFrame(time);
+      this.drawFeatureReelAtmosphere(time);
       this.drawReels(time);
+      this.drawFeatureRoundSplash(time);
       this.drawPaylinePreview(time);
       this.drawWinLayer(time);
       this.drawLineRails(time);
+      this.drawFeatureHud(time);
       this.drawParticles();
       this.drawStatus();
       this.drawTicker();
       if (!(this.state === 'WIN' && this.winTier === 'max')) this.drawControls(time);
       this.drawMoneyTransfers(time);
+      this.drawFeatureCollectionTrails(time);
+      this.drawWinBalanceTransfer(time);
       this.drawMaxWinOverlay(time);
       this.drawFeatureOverlay(time);
       if (this.overlay) {
-        this.hitAreas = [];
+        this.hitAreas.length = 0;
         this.drawOverlay();
       }
       ctx.restore();
@@ -1265,19 +1598,16 @@
       const ctx = this.ctx;
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
-      SKY_STAR_POINTS.forEach(([x, y, size], index) => {
+      const starStep = this.performanceProfile.lowPower ? 2 : 1;
+      for (let index = 0; index < SKY_STAR_POINTS.length; index += starStep) {
+        const [x, y, size] = SKY_STAR_POINTS[index];
         const wave = Math.sin(time * (0.0022 + (index % 4) * 0.00017) + index * 1.73);
         const pulse = Math.pow(Math.max(0, wave), 2.4);
-        if (pulse < 0.035) return;
+        if (pulse < 0.035) continue;
         const radius = (2.3 + pulse * 5.8) * size;
-        const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 2.6);
-        glow.addColorStop(0, `rgba(255,255,225,${0.72 * pulse})`);
-        glow.addColorStop(0.28, `rgba(255,221,116,${0.34 * pulse})`);
-        glow.addColorStop(1, 'rgba(255,198,76,0)');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(x, y, radius * 2.6, 0, TAU);
-        ctx.fill();
+        const glowSize = radius * 5.2;
+        ctx.globalAlpha = 0.72 * pulse;
+        ctx.drawImage(this.starGlowSprite, x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
 
         ctx.save();
         ctx.translate(x, y);
@@ -1289,7 +1619,7 @@
         ctx.fillRect(-0.75 * size, -radius, 1.5 * size, radius * 2);
         ctx.fillRect(-radius, -0.75 * size, radius * 2, 1.5 * size);
         ctx.restore();
-      });
+      }
       ctx.restore();
     }
 
@@ -1297,7 +1627,8 @@
       const ctx = this.ctx;
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
-      for (let index = 0; index < 18; index += 1) {
+      const dustCount = this.performanceProfile.lowPower ? 8 : 18;
+      for (let index = 0; index < dustCount; index += 1) {
         const duration = 9800 + (index % 6) * 1150;
         const progress = ((time + index * 1783) % duration) / duration;
         const lane = (index * 137 + (index % 3) * 47) % W;
@@ -1308,14 +1639,9 @@
         const shimmer = 0.48 + Math.sin(time * 0.003 + index * 1.9) * 0.28;
         const alpha = Math.max(0.025, edgeFade * shimmer * 0.18);
         const radius = 1.2 + (index % 4) * 0.55;
-        const dust = ctx.createRadialGradient(x, y, 0, x, y, radius * 3.8);
-        dust.addColorStop(0, `rgba(255,248,194,${alpha})`);
-        dust.addColorStop(0.35, `rgba(255,210,92,${alpha * 0.58})`);
-        dust.addColorStop(1, 'rgba(255,190,62,0)');
-        ctx.fillStyle = dust;
-        ctx.beginPath();
-        ctx.arc(x, y, radius * 3.8, 0, TAU);
-        ctx.fill();
+        const glowSize = radius * 7.6;
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(this.dustGlowSprite, x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
       }
       ctx.restore();
     }
@@ -1354,14 +1680,8 @@
       ctx.moveTo(x, y);
       ctx.quadraticCurveTo(x + direction * 78, y - 31, x + direction * 150, y - 43);
       ctx.stroke();
-      const head = ctx.createRadialGradient(x, y, 0, x, y, 14);
-      head.addColorStop(0, '#fffde4');
-      head.addColorStop(0.28, 'rgba(168,235,255,0.88)');
-      head.addColorStop(1, 'rgba(92,160,255,0)');
-      ctx.fillStyle = head;
-      ctx.beginPath();
-      ctx.arc(x, y, 14, 0, TAU);
-      ctx.fill();
+      ctx.globalAlpha = fade * 0.72;
+      ctx.drawImage(this.starGlowSprite, x - 14, y - 14, 28, 28);
       ctx.restore();
     }
 
@@ -1373,18 +1693,13 @@
         const direction = side ? -1 : 1;
         const baseX = side ? 650 : 130;
         const baseY = 425 + Math.sin(time * 0.0007 + side * 2) * 16;
-        for (let puff = 0; puff < 4; puff += 1) {
+        const puffCount = this.performanceProfile.lowPower ? 2 : 4;
+        for (let puff = 0; puff < puffCount; puff += 1) {
           const travel = (time * 0.008 + puff * 33 + side * 19) % 120;
           const x = baseX + direction * travel;
           const y = baseY - puff * 14 - travel * 0.12;
           const radius = 16 + puff * 7;
-          const mist = ctx.createRadialGradient(x, y, 1, x, y, radius);
-          mist.addColorStop(0, 'rgba(255, 245, 222, 0.075)');
-          mist.addColorStop(1, 'rgba(255, 245, 222, 0)');
-          ctx.fillStyle = mist;
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, TAU);
-          ctx.fill();
+          ctx.drawImage(this.mistGlowSprite, x - radius, y - radius, radius * 2, radius * 2);
         }
       });
       ctx.restore();
@@ -1402,24 +1717,30 @@
       this.drawImageContain(ASSETS.cloud3, 403 + driftB, 290, 190, 128);
       this.drawImageContain(ASSETS.cloud4, 84 + driftA, 235, 120, 72);
 
-      ctx.globalAlpha = 0.32;
-      this.drawImageContain(ASSETS.cloud2, 410 - driftA * 0.45, 225, 130, 62);
+      if (!this.performanceProfile.lowPower) {
+        ctx.globalAlpha = 0.32;
+        this.drawImageContain(ASSETS.cloud2, 410 - driftA * 0.45, 225, 130, 62);
+      }
       ctx.restore();
     }
 
     getIdleMascotFrame(time) {
-      const frames = [ASSETS.idle1, ASSETS.idle2, ASSETS.idle3, ASSETS.idle4, ASSETS.idle5];
-      const sequence = [0, 1, 2, 3, 4, 3, 2, 1];
-      const frameIndex = sequence[Math.floor(time / 260) % sequence.length];
-      return frames[frameIndex] || frames.find(Boolean) || ASSETS.mascot;
+      const frameNumber = IDLE_FRAME_SEQUENCE[Math.floor(time / 260) % IDLE_FRAME_SEQUENCE.length];
+      return ASSETS[`idle${frameNumber}`]
+        || ASSETS.idle1
+        || ASSETS.idle2
+        || ASSETS.idle3
+        || ASSETS.idle4
+        || ASSETS.idle5
+        || ASSETS.mascot;
     }
 
     drawCelebrationMascot(time) {
       const config = WIN_TIER_CONFIG[this.winTier] || WIN_TIER_CONFIG.medium;
       const celebrationStart = this.getWinTiming().stepEnd + Math.min(180, config.mascotDelay * 0.18);
       const elapsed = Math.max(0, time - this.winStart - celebrationStart);
-      const frames = [ASSETS.celebration1, ASSETS.celebration2, ASSETS.celebration3, ASSETS.celebration4, ASSETS.celebration5];
-      const frame = frames[Math.min(frames.length - 1, Math.floor(elapsed / 190))] || this.getIdleMascotFrame(time);
+      const frameKey = CELEBRATION_FRAME_KEYS[Math.min(CELEBRATION_FRAME_KEYS.length - 1, Math.floor(elapsed / 190))];
+      const frame = ASSETS[frameKey] || this.getIdleMascotFrame(time);
       const appear = easeOutBack(clamp(elapsed / 330, 0, 1));
       const strength = { medium: 0.55, big: 0.82, mega: 1, max: 1.12 }[this.winTier] || 0.5;
       const jump = -Math.sin(clamp(elapsed / 1100, 0, 1) * Math.PI) * 42 * strength;
@@ -1609,6 +1930,79 @@
       else REEL_LAYOUT.forEach((reel) => this.roundRect(reel.x, reel.y, reel.w, reel.h, 14, '#17195d', '#f5b95e', 6));
     }
 
+    drawFeatureReelAtmosphere(time) {
+      if (!this.isFortuneActive()) return;
+      const ctx = this.ctx;
+      REEL_LAYOUT.forEach((reel, reelIndex) => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(reel.x + 4, reel.y + 4, reel.w - 8, reel.h - 8);
+        ctx.clip();
+
+        ctx.fillStyle = 'rgba(37, 10, 71, 0.28)';
+        ctx.fillRect(reel.x, reel.y, reel.w, reel.h);
+
+        if (!this.performanceProfile.lowPower) {
+          const drift = (Math.sin(time * 0.00072 + reelIndex * 1.9) + 1) / 2;
+          const glowX = reel.x + reel.w * (0.2 + drift * 0.6);
+          const glowY = reel.y + reel.h * (0.35 + Math.sin(time * 0.00051 + reelIndex) * 0.16);
+          const aura = ctx.createRadialGradient(glowX, glowY, 8, glowX, glowY, reel.w * 0.92);
+          aura.addColorStop(0, 'rgba(120, 255, 185, 0.25)');
+          aura.addColorStop(0.42, 'rgba(255, 214, 87, 0.13)');
+          aura.addColorStop(1, 'rgba(79, 24, 116, 0)');
+          ctx.globalCompositeOperation = 'screen';
+          ctx.fillStyle = aura;
+          ctx.fillRect(reel.x, reel.y, reel.w, reel.h);
+
+          for (let mote = 0; mote < 5; mote += 1) {
+            const cycle = ((time * (0.000055 + mote * 0.000004) + reelIndex * 0.21 + mote * 0.19) % 1 + 1) % 1;
+            const x = reel.x + 18 + ((mote * 67 + reelIndex * 31) % Math.max(30, reel.w - 36));
+            const y = reel.y + reel.h - cycle * (reel.h + 55);
+            const alpha = Math.sin(cycle * Math.PI) * 0.54;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = mote % 2 ? '#a6ffd2' : '#ffe879';
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.shadowBlur = 11;
+            ctx.beginPath();
+            ctx.arc(x, y, 2.4 + (mote % 3), 0, TAU);
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      });
+    }
+
+    drawFeatureRoundSplash(time) {
+      if (!this.activeFeatureSpin || this.state !== 'SPIN_LOOP') return;
+      const elapsed = time - this.spinStart;
+      const duration = this.turbo ? 500 : 860;
+      if (elapsed < 0 || elapsed > duration) return;
+      const enter = easeOutBack(clamp(elapsed / (duration * 0.32), 0, 1));
+      const exit = clamp((duration - elapsed) / (duration * 0.36), 0, 1);
+      const alpha = Math.min(1, enter) * exit;
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.translate(390, 704);
+      ctx.scale((0.78 + enter * 0.22), (0.78 + enter * 0.22));
+      ctx.globalAlpha = alpha;
+      ctx.globalCompositeOperation = 'screen';
+      const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 180);
+      glow.addColorStop(0, 'rgba(255, 238, 135, 0.54)');
+      glow.addColorStop(1, 'rgba(129, 255, 199, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(-210, -82, 420, 164);
+      ctx.globalCompositeOperation = 'source-over';
+      this.roundRect(-128, -31, 256, 62, 28, '#25104eea', '#ffe477', 4);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '900 24px Arial Black, Arial';
+      ctx.fillStyle = '#fff3a7';
+      ctx.shadowColor = '#ffd858';
+      ctx.shadowBlur = 16;
+      ctx.fillText(`RODADA ${Math.max(1, this.featureSpinIndex)} DE ${FEATURE_SPINS}`, 0, 1);
+      ctx.restore();
+    }
+
     drawReels(time) {
       this.reels.forEach((reel) => {
         const ctx = this.ctx;
@@ -1635,12 +2029,7 @@
         } else {
           const base = Math.floor((time - this.spinStart) / 95 + reel.index * 4);
           for (let row = -1; row <= reel.rows; row += 1) {
-            const prize = this.randomPrize();
-            const symbol = {
-              type: reel.strip[(base + row + reel.strip.length) % reel.strip.length],
-              prize,
-              prizeAmount: prize * this.spinBet,
-            };
+            const symbol = reel.strip[(base + row + reel.strip.length) % reel.strip.length];
             const y = reel.y + row * reel.cellH + reel.offset - reel.cellH;
             this.drawSymbol(symbol, reel, row, y, 0.84, true);
           }
@@ -1661,7 +2050,7 @@
       const tilt = 0;
       ctx.save();
       ctx.globalAlpha = alpha;
-      if (moving) ctx.filter = 'blur(2.4px)';
+      if (moving && !this.performanceProfile.lowPower) ctx.filter = 'blur(2.4px)';
       ctx.translate(cx, cy + bob);
       ctx.rotate(tilt);
       ctx.scale(Math.max(0.02, flip) * breathe * emphasis, breathe * emphasis);
@@ -1669,7 +2058,7 @@
         const amount = Number.isFinite(symbol.prizeAmount)
           ? symbol.prizeAmount
           : (symbol.prize || 0.5) * this.spinBet;
-        this.drawPrize(0, 0, amount, w, h);
+        this.drawPrize(0, 0, amount, w, h, { feature: this.activeFeatureSpin });
       }
       else this.drawAssetSymbol(symbol.type, 0, 0, w * 0.96, h * 0.94, reel.index);
       ctx.strokeStyle = '#f4be6822';
@@ -1689,16 +2078,14 @@
     }
 
     drawAssetSymbol(type, cx, cy, maxW, maxH, reelIndex) {
-      const map = {
-        wild: ASSETS.symbolWild,
-        rabbit: ASSETS.symbolWhiteRabbit,
-        bag: ASSETS.symbolBag,
-        cards: ASSETS.symbolGoldenRabbit,
-        coins: ASSETS.symbolCoin,
-        rockets: ASSETS.symbolLantern,
-        carrot: ASSETS.symbolCarrot,
-      };
-      const image = map[type];
+      let image = null;
+      if (type === 'wild') image = ASSETS.symbolWild;
+      else if (type === 'rabbit') image = ASSETS.symbolWhiteRabbit;
+      else if (type === 'bag') image = ASSETS.symbolBag;
+      else if (type === 'cards') image = ASSETS.symbolGoldenRabbit;
+      else if (type === 'coins') image = ASSETS.symbolCoin;
+      else if (type === 'rockets') image = ASSETS.symbolLantern;
+      else if (type === 'carrot') image = ASSETS.symbolCarrot;
       if (!this.drawImageContain(image, cx, cy, maxW, maxH)) {
         this.drawOriginalSymbol(type, cx, cy, maxW, maxH);
         return;
@@ -1725,18 +2112,109 @@
       ctx.restore();
     }
 
+    getVisibleFeatureTotal(time) {
+      if (!this.activeFeatureSpin || this.state !== 'WIN' || this.featureRoundWin <= 0) return this.featureTotal;
+      const timing = this.getWinTiming();
+      const elapsed = Math.max(0, time - this.winStart - timing.settleDuration * 0.55);
+      const duration = Math.max(320, Math.min(1500, timing.stepEnd - timing.settleDuration));
+      const raw = clamp(elapsed / duration, 0, 1);
+      const eased = raw * raw * (3 - 2 * raw);
+      return this.featureRoundStartTotal + this.featureRoundWin * eased;
+    }
+
+    drawFeatureHud(time) {
+      if (!this.isFortuneActive() || this.state.startsWith('FEATURE_')) return;
+      const ctx = this.ctx;
+      const currentRound = clamp(this.featureSpinIndex || 1, 1, FEATURE_SPINS);
+      const visibleTotal = this.getVisibleFeatureTotal(time);
+      const pulse = 1 + Math.sin(time * 0.0065) * 0.012;
+      const x = 390;
+      const y = 363;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(pulse, pulse);
+      const glow = ctx.createRadialGradient(0, 0, 8, 0, 0, 230);
+      glow.addColorStop(0, 'rgba(255,230,112,0.38)');
+      glow.addColorStop(1, 'rgba(119,42,129,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(-255, -60, 510, 120);
+      this.roundRect(-218, -30, 436, 60, 28, '#25104eea', '#ffd55c', 4);
+      ctx.shadowColor = '#ffca55';
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = '#fff0a0';
+      ctx.textBaseline = 'middle';
+      ctx.font = '900 20px Arial Black, Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText(`RODADA ${currentRound}/${FEATURE_SPINS}`, -192, -2);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = this.featureLimitReached ? '#fff5a3' : '#9fffd1';
+      ctx.fillText(this.featureLimitReached ? 'LIMITE 5000x' : `FORTUNA ${money(visibleTotal)}`, 192, -2);
+      ctx.shadowBlur = 0;
+
+      const segmentWidth = 42;
+      for (let index = 0; index < FEATURE_SPINS; index += 1) {
+        const completed = index < currentRound;
+        const segmentX = -191 + index * (segmentWidth + 7);
+        ctx.fillStyle = completed ? '#ffd65a' : '#563274';
+        ctx.globalAlpha = completed ? 1 : 0.72;
+        this.roundRect(segmentX, 17, segmentWidth, 5, 3, ctx.fillStyle);
+      }
+      ctx.restore();
+    }
+
+    drawFeatureCollectionTrails(time) {
+      if (!this.activeFeatureSpin || this.state !== 'WIN' || this.featureRoundWin <= 0) return;
+      const prizes = this.result.prizes || [];
+      if (!prizes.length) return;
+      const ctx = this.ctx;
+      const maxTrails = this.performanceProfile.lowPower ? 5 : prizes.length;
+      const duration = this.turbo ? 520 : 980;
+      for (let index = 0; index < Math.min(maxTrails, prizes.length); index += 1) {
+        const prize = prizes[index];
+        const delay = index * (this.turbo ? 24 : 48);
+        const progress = clamp((time - this.featureCollectStart - 260 - delay) / duration, 0, 1);
+        if (progress <= 0 || progress >= 1) continue;
+        const reel = REEL_LAYOUT[prize.c];
+        const startX = reel.x + reel.w / 2;
+        const startY = reel.y + prize.r * reel.cellH + reel.cellH / 2;
+        const endX = 390;
+        const endY = 382;
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const controlX = startX + (endX - startX) * 0.45 + Math.sin(index * 2.1) * 58;
+        const controlY = Math.min(startY, endY) - 90 - (index % 3) * 24;
+        const inverse = 1 - eased;
+        const x = inverse * inverse * startX + 2 * inverse * eased * controlX + eased * eased * endX;
+        const y = inverse * inverse * startY + 2 * inverse * eased * controlY + eased * eased * endY;
+        const alpha = Math.sin(progress * Math.PI);
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = index % 2 ? '#9dffd1' : '#ffe878';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.arc(x, y, 5 + (index % 3) * 1.6, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
     drawFeatureOverlay(time) {
       if (!['FEATURE_INTRO', 'FEATURE_OUTRO'].includes(this.state)) return;
-      this.hitAreas = [];
+      this.hitAreas.length = 0;
       const ctx = this.ctx;
       const intro = this.state === 'FEATURE_INTRO';
       const started = intro ? this.featureIntroStart : this.featureOutroStart;
-      const progress = clamp((time - started) / (intro ? 2300 : 3000), 0, 1);
+      const progress = clamp((time - started) / (intro ? FEATURE_INTRO_DURATION : FEATURE_OUTRO_DURATION), 0, 1);
       const appear = clamp(progress * 4, 0, 1);
       const pulse = 1 + Math.sin(time * 0.009) * 0.04;
 
       ctx.save();
-      ctx.fillStyle = `rgba(20, 5, 28, ${0.72 * appear})`;
+      const veil = ctx.createRadialGradient(390, 735, 110, 390, 735, 670);
+      veil.addColorStop(0, `rgba(46, 12, 61, ${0.18 * appear})`);
+      veil.addColorStop(0.55, `rgba(28, 7, 42, ${0.46 * appear})`);
+      veil.addColorStop(1, `rgba(12, 3, 24, ${0.66 * appear})`);
+      ctx.fillStyle = veil;
       ctx.fillRect(0, 0, W, H);
       const glow = ctx.createRadialGradient(390, 720, 20, 390, 720, 390);
       glow.addColorStop(0, '#ffdf67cc');
@@ -1758,8 +2236,33 @@
         ctx.stroke();
       }
 
+      if (intro) {
+        for (let index = 0; index < FEATURE_SPINS; index += 1) {
+          const angle = time * 0.00055 + index * TAU / FEATURE_SPINS;
+          const orbit = 205 + Math.sin(time * 0.002 + index) * 12;
+          const x = 390 + Math.cos(angle) * orbit;
+          const y = 735 + Math.sin(angle) * orbit * 0.72;
+          ctx.globalAlpha = appear * (0.72 + Math.sin(time * 0.008 + index) * 0.2);
+          ctx.fillStyle = index % 2 ? '#9dffd1' : '#ffe26c';
+          ctx.shadowColor = ctx.fillStyle;
+          ctx.shadowBlur = 18;
+          ctx.beginPath();
+          ctx.arc(x, y, 11, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#55265f';
+          ctx.font = '900 12px Arial Black, Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(index + 1), x, y + 1);
+        }
+      }
+
       ctx.restore();
-      const featureMascot = this.getIdleMascotFrame(time);
+      const outroElapsed = Math.max(0, time - this.featureOutroStart);
+      const featureMascot = intro
+        ? this.getIdleMascotFrame(time)
+        : (ASSETS[CELEBRATION_FRAME_KEYS[Math.floor(outroElapsed / 210) % CELEBRATION_FRAME_KEYS.length]]
+          || this.getIdleMascotFrame(time));
       if (featureMascot) {
         ctx.save();
         ctx.translate(390, 735);
@@ -1788,6 +2291,11 @@
         ctx.font = '900 38px Arial Black, Arial';
         ctx.strokeText('RODADAS DA FORTUNA', 390, 1200);
         ctx.fillText('RODADAS DA FORTUNA', 390, 1200);
+        ctx.font = '800 25px Arial, sans-serif';
+        ctx.fillStyle = '#d8ffe8';
+        ctx.lineWidth = 6;
+        ctx.strokeText('SOMENTE SÍMBOLOS DE PRÊMIO', 390, 1252);
+        ctx.fillText('SOMENTE SÍMBOLOS DE PRÊMIO', 390, 1252);
       } else {
         const zeroProgress = clamp((time - this.featureOutroStart) / 650, 0, 1);
         const zeroScale = easeOutBack(zeroProgress);
@@ -1798,12 +2306,13 @@
         ctx.strokeText('0 RODADAS', 0, 0);
         ctx.fillText('0 RODADAS', 0, 0);
         ctx.restore();
+        const countProgress = easeOutCubic(clamp((time - this.featureOutroStart - 240) / 1350, 0, 1));
         ctx.font = '900 72px Arial Black, Arial';
-        ctx.strokeText(money(this.featureTotal), 390, 1120);
-        ctx.fillText(money(this.featureTotal), 390, 1120);
+        ctx.strokeText(money(this.featureTotal * countProgress), 390, 1120);
+        ctx.fillText(money(this.featureTotal * countProgress), 390, 1120);
         ctx.font = '700 28px Arial';
-        ctx.fillStyle = '#fff6da';
-        ctx.fillText('GANHO ACUMULADO', 390, 1180);
+        ctx.fillStyle = this.featureLimitReached ? '#fff09a' : '#fff6da';
+        ctx.fillText(this.featureLimitReached ? 'LIMITE MÁXIMO 5000x' : 'GANHO ACUMULADO', 390, 1180);
       }
       ctx.restore();
     }
@@ -2048,10 +2557,29 @@
     drawPrize(cx, cy, value, maxW = 170, maxH = 190, options = {}) {
       const ctx = this.ctx;
       const high = options.showMultiplier ? value >= 100 : value >= Math.max(50, this.spinBet * 25);
-      const pulse = high ? 1 + Math.sin(this.renderTime * 0.009) * 0.035 : 1;
+      const feature = Boolean(options.feature);
+      const pulse = high
+        ? 1 + Math.sin(this.renderTime * 0.009) * 0.035
+        : feature
+          ? 1 + Math.sin(this.renderTime * 0.0065 + value * 0.13) * 0.018
+          : 1;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.scale(pulse, pulse);
+      if (feature) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = 0.24 + Math.sin(this.renderTime * 0.005 + value) * 0.07;
+        const aura = ctx.createRadialGradient(0, 0, 5, 0, 0, Math.min(maxW, maxH) * 0.54);
+        aura.addColorStop(0, '#fff4a2');
+        aura.addColorStop(0.44, '#79ffc0');
+        aura.addColorStop(1, 'rgba(88, 38, 129, 0)');
+        ctx.fillStyle = aura;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.min(maxW, maxH) * 0.54, 0, TAU);
+        ctx.fill();
+        ctx.restore();
+      }
       if (high) {
         ctx.save();
         ctx.globalAlpha = 0.22 + Math.sin(this.renderTime * 0.008) * 0.08;
@@ -2092,11 +2620,7 @@
     }
 
     getPaylineRailPoint(lineNumber, side) {
-      const railIndex = LINE_RAILS[side].indexOf(lineNumber);
-      return {
-        x: side === 'left' ? 22 : 758,
-        y: LINE_RAIL_Y[railIndex],
-      };
+      return PAYLINE_RAIL_POINTS[lineNumber - 1][side];
     }
 
     tracePayline(lineNumber) {
@@ -2153,20 +2677,31 @@
       const ctx = this.ctx;
       const pulse = 0.55 + 0.45 * Math.sin((time - this.winStart) * 0.014);
       const steps = this.getWinSteps();
-      const activeSteps = steps.length
-        ? (this.lineShowAll ? steps : [steps[this.lineCycle]].filter(Boolean))
-        : [];
-      const activeLines = activeSteps.filter((step) => step.kind === 'line');
-      const activeCells = activeSteps.length
-        ? [...new Map(activeSteps.flatMap((step) => step.cells).map((cell) => [`${cell.c}-${cell.r}`, cell])).values()]
-        : this.result.cells;
-      const activeKeys = new Set(activeCells.map(({ c, r }) => `${c}-${r}`));
+      const currentStep = steps[this.lineCycle];
+      const activeCells = this.activeWinCells;
+      const activeFlags = this.activeWinCellFlags;
+      activeCells.length = 0;
+      activeFlags.fill(0);
+      const collectCells = (cells) => {
+        for (let index = 0; index < cells.length; index += 1) {
+          const cell = cells[index];
+          const key = cell.c * 4 + cell.r;
+          if (activeFlags[key]) continue;
+          activeFlags[key] = 1;
+          activeCells.push(cell);
+        }
+      };
+      if (steps.length) {
+        if (this.lineShowAll) {
+          for (let index = 0; index < steps.length; index += 1) collectCells(steps[index].cells);
+        } else if (currentStep) collectCells(currentStep.cells);
+      } else collectCells(this.result.cells);
 
       this.drawWinAtmosphere(time);
 
       REEL_LAYOUT.forEach((reel, c) => {
         for (let r = 0; r < reel.rows; r += 1) {
-          if (activeKeys.has(`${c}-${r}`)) continue;
+          if (activeFlags[c * 4 + r]) continue;
           ctx.save();
           ctx.fillStyle = '#100a2f94';
           this.roundRect(reel.x + 5, reel.y + r * reel.cellH + 4, reel.w - 10, reel.cellH - 8, 12, '#100a2f94');
@@ -2203,7 +2738,10 @@
         ctx.restore();
       });
 
-      if (activeLines.length) {
+      const hasActiveLine = this.lineShowAll
+        ? this.result.lines.length > 0
+        : currentStep?.kind === 'line';
+      if (hasActiveLine) {
         ctx.save();
         if (!this.lineShowAll) {
           const local = elapsed - timing.settleDuration - this.lineCycle * timing.stepDuration;
@@ -2217,14 +2755,19 @@
         ctx.globalAlpha = this.lineShowAll ? 0.88 : 1;
         ctx.shadowColor = '#ff8f25';
         ctx.shadowBlur = 16;
-        activeLines.forEach((line) => {
-          this.tracePayline(line.index + 1);
+        if (this.lineShowAll) {
+          this.result.lines.forEach((line) => {
+            this.tracePayline(line.index + 1);
+            ctx.stroke();
+          });
+        } else {
+          this.tracePayline(currentStep.index + 1);
           ctx.stroke();
-        });
+        }
         ctx.restore();
       }
-      if (!this.lineShowAll && activeSteps.length === 1 && activeSteps[0].kind !== 'prize') {
-        this.drawStepPayout(activeSteps[0], time);
+      if (!this.lineShowAll && currentStep && currentStep.kind !== 'prize') {
+        this.drawStepPayout(currentStep, time);
       }
       this.drawWinCategory(time);
     }
@@ -2666,23 +3209,7 @@
       ctx.globalAlpha = alpha;
       ctx.shadowColor = accent;
       ctx.shadowBlur = size * 0.9;
-      const face = ctx.createRadialGradient(-size * 0.28, -size * 0.32, 1, 0, 0, size);
-      face.addColorStop(0, '#fff5a6');
-      face.addColorStop(0.38, accent);
-      face.addColorStop(1, '#b95a0d');
-      ctx.fillStyle = face;
-      ctx.strokeStyle = '#fff0a0';
-      ctx.lineWidth = Math.max(1.5, size * 0.13);
-      ctx.beginPath();
-      ctx.arc(0, 0, size, 0, TAU);
-      ctx.fill();
-      ctx.stroke();
-      ctx.rotate(Math.PI / 4);
-      ctx.fillStyle = '#7c3514';
-      ctx.fillRect(-size * 0.2, -size * 0.2, size * 0.4, size * 0.4);
-      ctx.strokeStyle = '#ffd76a';
-      ctx.lineWidth = Math.max(1, size * 0.09);
-      ctx.strokeRect(-size * 0.2, -size * 0.2, size * 0.4, size * 0.4);
+      ctx.drawImage(this.getCoinSprite(accent), -size, -size, size * 2, size * 2);
       ctx.restore();
     }
 
@@ -2829,19 +3356,20 @@
       const idleSelection = this.state === 'IDLE';
       const steps = this.state === 'WIN' ? this.getWinSteps() : [];
       const currentStep = steps[this.lineCycle];
-      const winningLines = idleSelection
-        ? new Set(PAYLINES.map((_, index) => index + 1))
-        : (this.state === 'WIN' && this.result.lines.length
-          ? new Set((this.lineShowAll
-            ? this.result.lines
-            : (currentStep?.kind === 'line' ? [currentStep] : [])).map((line) => line.index + 1))
-          : new Set());
+      const winningLines = this.winningLineFlags;
+      winningLines.fill(idleSelection ? 1 : 0);
+      if (!idleSelection && this.state === 'WIN') {
+        if (this.lineShowAll) {
+          this.result.lines.forEach((line) => { winningLines[line.index + 1] = 1; });
+        } else if (currentStep?.kind === 'line') winningLines[currentStep.index + 1] = 1;
+      }
       const pulse = idleSelection ? 1 : 0.78 + Math.sin(time * 0.018) * 0.22;
 
-      Object.entries(LINE_RAILS).forEach(([side, order]) => {
+      ['left', 'right'].forEach((side) => {
+        const order = LINE_RAILS[side];
         const x = side === 'left' ? 22 : 758;
         order.forEach((number, index) => {
-          const active = winningLines.has(number);
+          const active = winningLines[number] === 1;
           if (!active) return;
           ctx.save();
           ctx.textAlign = 'center';
@@ -2885,6 +3413,9 @@
       const accounting = isWin ? this.getWinAccounting(this.renderTime) : null;
       const displayText = isWin ? this.getWinBannerText(accounting) : this.tickerText;
       const centerDisplay = isWin || this.tickerMode === 'center';
+      const betBoundary = !isWin && (this.tickerAccent === 'bet-max' || this.tickerAccent === 'bet-min');
+      const swapAge = this.tickerSwapStarted ? this.renderTime - this.tickerSwapStarted : Infinity;
+      const swapProgress = easeOutCubic(clamp(swapAge / 480, 0, 1));
       ctx.save();
       if (!ASSETS.displayFrame) this.roundRect(x, y, w, h, 18, '#251760', '#f7b952', 4);
 
@@ -2893,6 +3424,42 @@
       this.roundedRectPath(inner.x, inner.y, inner.w, inner.h, inner.radius);
       ctx.fillStyle = '#251760';
       ctx.fill();
+      if (betBoundary) {
+        const isMaximum = this.tickerAccent === 'bet-max';
+        const boundaryFill = ctx.createLinearGradient(inner.x, inner.y, inner.x + inner.w, inner.y + inner.h);
+        if (isMaximum) {
+          boundaryFill.addColorStop(0, '#54170b');
+          boundaryFill.addColorStop(0.5, '#a84908');
+          boundaryFill.addColorStop(1, '#6f2507');
+        } else {
+          boundaryFill.addColorStop(0, '#101b58');
+          boundaryFill.addColorStop(0.5, '#14577c');
+          boundaryFill.addColorStop(1, '#18245f');
+        }
+        ctx.fillStyle = boundaryFill;
+        ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
+
+        const glowX = inner.x + inner.w * (0.18 + 0.64 * swapProgress);
+        const boundaryGlow = ctx.createRadialGradient(glowX, y + h / 2, 4, glowX, y + h / 2, inner.w * 0.34);
+        boundaryGlow.addColorStop(0, isMaximum ? 'rgba(255,240,126,0.58)' : 'rgba(127,245,255,0.5)');
+        boundaryGlow.addColorStop(0.38, isMaximum ? 'rgba(255,167,43,0.25)' : 'rgba(57,190,231,0.22)');
+        boundaryGlow.addColorStop(1, 'rgba(30,15,82,0)');
+        ctx.fillStyle = boundaryGlow;
+        ctx.fillRect(inner.x, inner.y, inner.w, inner.h);
+
+        const markerPulse = 0.78 + Math.sin(this.renderTime * 0.006) * 0.22;
+        ctx.globalAlpha = markerPulse;
+        ctx.fillStyle = isMaximum ? '#fff19a' : '#bafcff';
+        ctx.shadowColor = isMaximum ? '#ffbd32' : '#4fdfff';
+        ctx.shadowBlur = 14;
+        ctx.font = '900 22px Georgia, serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(isMaximum ? '◆' : '◇', inner.x + 42, y + h / 2 + 4);
+        ctx.fillText(isMaximum ? '◆' : '◇', inner.x + inner.w - 42, y + h / 2 + 4);
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+      }
       if (isWin) {
         const palette = this.getWinPanelPalette();
         const panelFill = ctx.createLinearGradient(x + 24, y, x + w - 24, y + h);
@@ -2934,9 +3501,11 @@
       const fittedSize = centerDisplay && estimatedWidth > w - 70
         ? Math.max(19, (isWin ? 43 : 34) * (w - 70) / estimatedWidth)
         : (isWin ? 43 : 34);
-      const textScale = isWin ? 0.72 + easeOutBack(clamp(winElapsed / 360, 0, 1)) * 0.28 : 1;
+      const smoothSwapScale = 0.965 + swapProgress * 0.035;
+      const textScale = isWin ? 0.72 + easeOutBack(clamp(winElapsed / 360, 0, 1)) * 0.28 : smoothSwapScale;
       const textX = centerDisplay ? x + w / 2 : this.tickerX;
-      ctx.translate(textX, y + h / 2 + (isWin ? 7 : 12));
+      const smoothSwapOffset = this.tickerSwapStarted ? (1 - swapProgress) * 5 : 0;
+      ctx.translate(textX, y + h / 2 + (isWin ? 7 : 12) + smoothSwapOffset);
       ctx.scale(textScale, textScale);
       ctx.font = `900 ${fittedSize}px Arial Black, Georgia, serif`;
       ctx.lineWidth = isWin ? 8 : 5;
@@ -3007,17 +3576,30 @@
         ctx.lineTo(390, 1455);
         ctx.stroke();
       }
-      const accounting = this.getWinAccounting(this.renderTime);
+      const visibleBalance = this.state === 'WIN'
+        ? this.getWinAccounting(this.renderTime).balance
+        : this.balance;
       ctx.textBaseline = 'middle';
 
       const pulseAge = this.balancePulseStart ? this.renderTime - this.balancePulseStart : Infinity;
-      const balancePulse = pulseAge < 620 ? 1 + Math.sin(clamp(pulseAge / 620, 0, 1) * Math.PI) * 0.08 : 1;
+      const incomingProgress = this.state === 'WIN'
+        ? this.getWinAccounting(this.renderTime).transferProgress
+        : 0;
+      const incomingPulse = incomingProgress > 0 && incomingProgress < 1
+        ? Math.sin(incomingProgress * Math.PI) * 0.055
+        : 0;
+      const balancePulse = (pulseAge < 620 ? 1 + Math.sin(clamp(pulseAge / 620, 0, 1) * Math.PI) * 0.08 : 1)
+        + incomingPulse;
       ctx.save();
       ctx.translate(226, 1428);
       ctx.scale(balancePulse, balancePulse);
+      if (incomingPulse > 0) {
+        ctx.shadowColor = '#ffe66c';
+        ctx.shadowBlur = 12 + incomingPulse * 180;
+      }
       ctx.fillStyle = '#fff9e5';
       ctx.font = '900 25px Arial Black, Arial';
-      ctx.fillText(money(accounting.balance), 0, 0);
+      ctx.fillText(money(visibleBalance), 0, 0);
       ctx.restore();
 
       const betCenterX = panel.x + panel.w * 0.75;
@@ -3075,47 +3657,57 @@
       ctx.restore();
     }
 
-    drawControls(time) {
-      const ctx = this.ctx;
-      const autoWasActive = this.autoActive;
-      const betControlsDisabled = this.state !== 'IDLE';
-      const controls = [
+    createControlDefinitions() {
+      return [
         {
-          id: 'turbo', x: 78, y: 1585, r: 64, image: ASSETS.turboButton, active: this.turbo, action: () => {
+          id: 'turbo', x: 78, y: 1585, r: 64, image: ASSETS.turboButton, action: () => {
             this.turbo = !this.turbo;
             this.message = this.turbo ? 'RODADA TURBO ATIVADA' : 'RODADA TURBO DESATIVADA';
             this.enqueuePanel(this.message, 'center', 2600);
           }
         },
         {
-          id: 'minus', x: 194, y: 1585, r: 51, image: ASSETS.minusButton, disabled: betControlsDisabled, action: () => {
+          id: 'minus', x: 194, y: 1585, r: 51, image: ASSETS.minusButton, action: () => {
             this.adjustBetLevel(-1);
           }
         },
         {
-          id: 'plus', x: 582, y: 1585, r: 51, image: ASSETS.plusButton, disabled: betControlsDisabled, action: () => {
+          id: 'plus', x: 582, y: 1585, r: 51, image: ASSETS.plusButton, action: () => {
             this.adjustBetLevel(1);
           }
         },
         {
-          id: 'auto', x: 699, y: 1585, r: 61, image: ASSETS.autoButton, active: this.autoActive, action: () => {
+          id: 'auto', x: 699, y: 1585, r: 61, image: ASSETS.autoButton, action: (autoWasActive) => {
             if (autoWasActive) return;
-            if (this.state === 'IDLE') this.openOverlay('auto');
+            if (this.state === 'IDLE' && !this.isFortuneActive()) this.openOverlay('auto');
           }
         },
       ];
+    }
+
+    handleSpinControl(autoWasActive) {
+      if (autoWasActive) return;
+      if (this.state === 'SPIN_LOOP') this.fastStop(); else this.spin();
+    }
+
+    drawControls(time) {
+      const ctx = this.ctx;
+      const betControlsDisabled = this.state !== 'IDLE' || this.isFortuneActive();
+      const controls = this.controlDefinitions;
 
       if (ASSETS.lowerOrnament) ctx.drawImage(ASSETS.lowerOrnament, 0, 1454, W, 274);
       controls.forEach((control) => {
+        const disabled = (control.id === 'minus' || control.id === 'plus') && betControlsDisabled;
+        const active = control.id === 'turbo' ? this.turbo : control.id === 'auto' ? this.autoActive : false;
         const pressed = this.pressScale(control.id, time);
         ctx.save();
         ctx.translate(control.x, control.y);
         ctx.scale(pressed, pressed);
-        ctx.globalAlpha = control.disabled ? 0.43 : 1;
+        ctx.globalAlpha = disabled ? 0.43 : 1;
         this.drawImageContain(control.image, 0, 0, control.r * 2, control.r * 2);
-        if (control.active) this.drawActiveControlState(control, time);
+        if (active) this.drawActiveControlState(control, time);
         ctx.restore();
-        if (!control.disabled) {
+        if (!disabled) {
           const hitRadius = control.r + 9;
           this.hit(control.x - hitRadius, control.y - hitRadius, hitRadius * 2, hitRadius * 2, control.action, control.id);
         }
@@ -3126,7 +3718,9 @@
       const fortuneCount = this.featureRemaining + (this.activeFeatureSpin && spinBusy ? 1 : 0);
       const idlePulse = spinBusy ? 1 : 1 + Math.sin(time * 0.0038) * 0.011;
       const pressedScale = this.pressScale('spin', time);
-      if (this.autoActive) {
+      if (fortuneActive) {
+        this.drawFortuneIndicator(time, fortuneCount, pressedScale, spinBusy);
+      } else if (this.autoActive) {
         this.drawAutoIndicator(time, Math.max(0, this.autoRemaining), pressedScale, spinBusy);
       } else {
         ctx.save();
@@ -3136,22 +3730,59 @@
         this.drawImageContain(ASSETS.spinButton, 0, 0, 194, 194);
         ctx.restore();
       }
-      if (fortuneActive) {
-        ctx.save();
-        ctx.translate(390, 1588);
-        this.roundRect(-48, -35, 96, 70, 22, '#411752dc', '#fff0a0', 5);
-        ctx.fillStyle = '#fff4b8';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = '900 52px Arial Black, Arial';
-        ctx.fillText(`${fortuneCount}`, 0, 4);
-        ctx.restore();
-      }
       this.drawPressFeedback(time);
-      this.hit(293, 1491, 194, 194, () => {
-        if (autoWasActive) return;
-        if (spinBusy) this.fastStop(); else this.spin();
-      }, 'spin');
+      this.hit(293, 1491, 194, 194, this.spinControlAction, 'spin');
+    }
+
+    drawFortuneIndicator(time, remaining, pressedScale, spinning) {
+      const ctx = this.ctx;
+      const pulse = 1 + Math.sin(time * 0.008) * (spinning ? 0.025 : 0.014);
+      ctx.save();
+      ctx.translate(390, 1588);
+      ctx.scale(pulse * pressedScale, pulse * pressedScale);
+      const base = ctx.createRadialGradient(-22, -30, 5, 0, 0, 92);
+      base.addColorStop(0, '#68f09a');
+      base.addColorStop(0.48, '#087d4d');
+      base.addColorStop(1, '#25104e');
+      ctx.fillStyle = base;
+      ctx.strokeStyle = '#ffd45c';
+      ctx.lineWidth = 10;
+      ctx.shadowColor = '#ffd85f';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(0, 0, 85, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.save();
+      ctx.rotate(spinning ? this.spinButtonAngle : time * 0.00018);
+      for (let index = 0; index < FEATURE_SPINS; index += 1) {
+        const angle = -Math.PI / 2 + index * TAU / FEATURE_SPINS;
+        const active = index < remaining;
+        ctx.fillStyle = active ? '#fff09a' : '#5b3473';
+        ctx.shadowColor = active ? '#ffd24f' : 'transparent';
+        ctx.shadowBlur = active ? 9 : 0;
+        ctx.beginPath();
+        ctx.arc(Math.cos(angle) * 69, Math.sin(angle) * 69, active ? 5.5 : 4, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.shadowBlur = 0;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff2aa';
+      ctx.font = '900 16px Arial Black, Arial';
+      ctx.fillText('FORTUNA', 0, -33);
+      ctx.strokeStyle = '#32104f';
+      ctx.lineWidth = 7;
+      ctx.font = '900 54px Arial Black, Arial';
+      ctx.strokeText(String(Math.max(0, remaining)), 0, 6);
+      ctx.fillText(String(Math.max(0, remaining)), 0, 6);
+      ctx.fillStyle = '#d8ffe6';
+      ctx.font = '800 12px Arial, sans-serif';
+      ctx.fillText(remaining === 1 ? 'RODADA' : 'RODADAS', 0, 44);
+      ctx.restore();
     }
 
     drawAutoIndicator(time, remaining, pressedScale, spinning) {
@@ -3204,7 +3835,7 @@
     }
 
     openOverlay(name) {
-      if (this.state === 'SPIN_LOOP' || this.state.startsWith('FEATURE_')) return;
+      if (this.state === 'SPIN_LOOP' || this.isFortuneActive()) return;
       this.overlay = name;
       this.overlayScroll = 0;
       this.overlayAfterClose = null;

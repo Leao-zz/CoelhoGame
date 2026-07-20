@@ -121,6 +121,25 @@
     return { total, lines, cells, prizes: prizeCells };
   }
 
+  function applyFeatureWin(featureTotal, spinWin, bet) {
+    const maximum = Math.max(0, 5000 * bet);
+    const current = clampNumber(featureTotal, 0, maximum);
+    const available = Math.max(0, maximum - current);
+    const awarded = clampNumber(spinWin, 0, available);
+    const total = current + awarded;
+    return {
+      awarded,
+      total,
+      maximum,
+      reachedMaximum: maximum > 0 && total >= maximum,
+    };
+  }
+
+  function clampNumber(value, minimum, maximum) {
+    const numeric = Number.isFinite(value) ? value : minimum;
+    return Math.max(minimum, Math.min(maximum, numeric));
+  }
+
   function simulate(spins, options = {}) {
     const random = options.random || Math.random;
     const baseBet = options.baseBet || 0.05;
@@ -139,8 +158,13 @@
       if (result.total > 0) wins += 1;
       if (random() < FEATURE_TRIGGER_RATE) {
         features += 1;
+        let featureTotal = 0;
         for (let featureSpin = 0; featureSpin < 8; featureSpin += 1) {
-          won += evaluateGrid(makeGrid(true, random), bet, lineStake).total;
+          const result = evaluateGrid(makeGrid(true, random), bet, lineStake);
+          const accounting = applyFeatureWin(featureTotal, result.total, bet);
+          won += accounting.awarded;
+          featureTotal = accounting.total;
+          if (accounting.reachedMaximum) break;
         }
       }
     }
@@ -161,6 +185,7 @@
     makeGrid,
     makeMixedWinGrid,
     evaluateGrid,
+    applyFeatureWin,
     simulate,
   };
 }));

@@ -75,6 +75,22 @@ approximately(prizes.total, prizeValues.reduce((sum, value) => sum + value, 0) *
 const maximum = core.evaluateGrid(uniform('prize', 500), bet, lineStake);
 approximately(maximum.total, 5000 * bet);
 
+const firstFeatureWin = core.applyFeatureWin(0, 120, bet);
+approximately(firstFeatureWin.awarded, 120);
+approximately(firstFeatureWin.total, 120);
+approximately(firstFeatureWin.maximum, 5000 * bet);
+assert.equal(firstFeatureWin.reachedMaximum, false);
+
+const cappedFeatureWin = core.applyFeatureWin((5000 * bet) - 10, 200, bet);
+approximately(cappedFeatureWin.awarded, 10);
+approximately(cappedFeatureWin.total, 5000 * bet);
+assert.equal(cappedFeatureWin.reachedMaximum, true);
+
+const exhaustedFeatureWin = core.applyFeatureWin(5000 * bet, 50, bet);
+approximately(exhaustedFeatureWin.awarded, 0);
+approximately(exhaustedFeatureWin.total, 5000 * bet);
+assert.equal(exhaustedFeatureWin.reachedMaximum, true);
+
 const simulation = core.simulate(1000, { random: seeded(777), baseBet, level });
 assert.equal(simulation.spins, 1000);
 approximately(simulation.wagered, 1000 * bet, 1e-7);
@@ -82,4 +98,4 @@ assert.ok(Number.isFinite(simulation.won));
 assert.ok(Number.isFinite(simulation.observedReturn));
 assert.ok(simulation.wins >= 0 && simulation.wins <= 1000);
 
-console.log('game-core: 11 testes concluídos');
+console.log('game-core: 14 testes concluídos');

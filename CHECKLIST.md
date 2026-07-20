@@ -59,6 +59,7 @@ Legenda:
 - [x] Iniciar a contagem pelo menor valor efetivamente ganho, sem exibir `WIN 0,00`, e acelerar a progressão em `2,6×`.
 - [x] Transferir visualmente os valores das combinações para o painel de ganho.
 - [x] Atualizar o Saldo somente depois da contagem e aplicar pulso curto na confirmação.
+- [x] Transferir o WIN acumulado do display para o Saldo em menos de 1 segundo, reduzindo um enquanto o outro aumenta e conectando ambos por moedas e trilha dourada.
 - [x] Manter a Aposta estável durante toda a sequência.
 - [x] Usar painel financeiro final com apenas `SALDO` e `APOSTA`; ganhos permanecem no display animado.
 - [x] Diferenciar brilho, moedas, partículas, fundo e reação do mascote em cada categoria.
@@ -310,6 +311,20 @@ Legenda:
 - [x] Implementar tela de total.
 - [x] Implementar saída da feature.
 - [x] Criar URL de teste `?demo=feature`.
+- [x] Travar a aposta que ativou a feature durante as oito rodadas grátis.
+- [x] Garantir que as rodadas da feature não descontem saldo.
+- [x] Aplicar somente símbolos de Prêmio em todas as posições.
+- [x] Limitar o acumulado total da feature a 5.000x a aposta que a ativou.
+- [x] Encerrar imediatamente as rodadas restantes ao atingir o limite de 5.000x.
+- [x] Retomar corretamente a Rodada Automática após a tela de total da feature.
+- [x] Adicionar atmosfera luminosa exclusiva dentro dos rolos da feature.
+- [x] Adicionar abertura visual de cada rodada com contador de 1 a 8.
+- [x] Adicionar painel persistente com rodada atual, progresso e total acumulado.
+- [x] Animar a coleta dos prêmios dos rolos em direção ao total acumulado.
+- [x] Dar pulso, aura e brilho próprios às placas de Prêmio da feature.
+- [x] Usar animação comemorativa do mascote na tela final da feature.
+- [x] Criar sons próprios para entrada, coleta e encerramento da feature.
+- [x] Reduzir partículas e brilhos da feature no perfil de baixo desempenho.
 
 ### Controles, aposta e auto-spin
 
@@ -465,6 +480,23 @@ Itens dependentes de hardware, API hospedeira ou material externo de comparaçã
 - [ ] Refinar mixagem final em alto-falantes de celulares físicos.
 - [ ] Comparar giro quadro a quadro quando houver vídeo de referência disponível.
 
+## Otimização mobile concluída
+
+- [x] Backing store do canvas adaptativo por largura, DPR e capacidade do aparelho.
+- [x] Perfil leve automático para celulares com pouca memória, poucos núcleos, economia de dados ou movimento reduzido.
+- [x] Limite automático de 30 FPS em aparelhos limitados e 60 FPS nos demais.
+- [x] Pausa efetiva de atualização e desenho quando a aba fica oculta.
+- [x] Carregamento de imagens deduplicado e decodificação assíncrona.
+- [x] Faixas giratórias reutilizam símbolos pré-calculados, sem sorteios e objetos novos a cada quadro.
+- [x] Linhas, células vencedoras, controles e tempos de vitória reutilizam estruturas em memória.
+- [x] Partículas e transferências financeiras compactadas no próprio array, sem cópias por quadro.
+- [x] Estrelas, poeira, névoa e moedas usam sprites pré-renderizados no lugar de gradientes caros por partícula.
+- [x] Quantidade de partículas, estrelas, poeira e névoa reduzida automaticamente no perfil leve.
+- [x] Redimensionamento da janela agrupado para evitar reconstruções repetidas do canvas.
+- [x] Testes automatizados e sintaxe validados após a otimização.
+- [x] Troca de aposta com transição contínua, sem reiniciar a opacidade do display.
+- [x] Aposta mínima destacada com paleta azul-turquesa e aposta máxima com paleta dourada.
+
 ## Pendências P1 — produção e integrações
 
 ### Integração, acessibilidade e desempenho
@@ -476,7 +508,7 @@ Itens dependentes de hardware, API hospedeira ou material externo de comparaçã
 - [ ] Melhorar navegação completa por teclado.
 - [ ] Criar controles HTML invisíveis para leitores de tela.
 - [ ] Adicionar botão Aposta Máxima explícito.
-- [ ] Confirmar comportamento dos limites do auto-spin durante feature.
+- [x] Confirmar comportamento dos limites do auto-spin durante feature, incluindo o total da feature como ganho individual.
 
 ### Histórico e rastreabilidade
 
