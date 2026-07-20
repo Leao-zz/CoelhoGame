@@ -1,6 +1,6 @@
 # Checklist mestre — CoelhoGame
 
-Última atualização: 18/07/2026
+Última atualização: 20/07/2026
 
 Legenda:
 
@@ -496,12 +496,15 @@ Itens dependentes de hardware, API hospedeira ou material externo de comparaçã
 - [x] Testes automatizados e sintaxe validados após a otimização.
 - [x] Troca de aposta com transição contínua, sem reiniciar a opacidade do display.
 - [x] Aposta mínima destacada com paleta azul-turquesa e aposta máxima com paleta dourada.
+- [x] Pacote raster de runtime convertido para WebP lossless com fallback PNG: 44 imagens, 3.507.786 → 2.879.276 bytes (-17,9%).
+- [x] Atlas avaliado e descartado: não reduziria os 36,8 MiB decodificados e aumentaria custo de recortes/animações.
+- [x] Telemetria de FPS adicionada em `?perf=1`, com FPS, p95 de frame/renderização, frames perdidos e long tasks em `window.__coelhoPerf`.
 
 ## Pendências P1 — produção e integrações
 
 ### Integração, acessibilidade e desempenho
 
-- [ ] Medir estabilidade de frames em celulares físicos.
+- [ ] Medir estabilidade de frames em celulares físicos — bloqueado em 20/07/2026: iPhone 15 Pro Max listado offline e nenhum Android conectado; harness `?perf=1` pronto.
 - [ ] Implementar callback real de fechar para iframe/app hospedeiro.
 - [ ] Confirmar com fonte oficial a lista exata de incrementos entre R$0,05 e R$4,00.
 - [ ] Criar tela real de perfil/carteira fictícia, se necessária.
@@ -538,7 +541,6 @@ Itens abaixo não fazem parte do projeto atual e não bloqueiam conclusão:
 - Definir strips/pesos versionados para produção.
 - Executar auditoria estatística extensa.
 - Criar seed auditável caso necessário.
-- Otimizar o novo pacote raster em atlas/WebP caso tamanho ou desempenho exijam.
 
 ## Critério para concluir versão gráfica/funcional
 

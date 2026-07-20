@@ -24,7 +24,7 @@
   const FEATURE_MAX_MULTIPLIER = 5000;
   const FEATURE_INTRO_DURATION = 2600;
   const FEATURE_OUTRO_DURATION = 3200;
-  const ASSET_VERSION = '27';
+  const ASSET_VERSION = '28';
   const getPerformanceProfile = () => {
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -105,52 +105,52 @@
     [61, 1193, 0.82], [395, 1238, 0.98], [620, 1437, 0.84], [310, 1587, 1.05],
   ]);
   const ASSET_PATHS = {
-    sky: 'assets/layout-v3/fundo.png',
-    roofLeft: 'assets/layout-v3/telhado_esquerda.png',
-    roofRight: 'assets/layout-v3/telhado_direita.png',
-    lantern: 'assets/layout-v3/balao_longo.png',
-    cloud1: 'assets/layout-v3/nuvem1.png',
-    cloud2: 'assets/layout-v3/nuvem2.png',
-    cloud3: 'assets/layout-v3/nuvem1.png',
-    cloud4: 'assets/layout-v3/nuvem2.png',
-    logo: 'assets/layout-v3/logo.png',
-    menuButton: 'assets/layout-v3/btn_menu.png',
-    reelFrame: 'assets/layout-v3/central_rolos.png',
-    displayFrame: 'assets/layout-v3/display_novo.png',
-    scoreFrame: 'assets/layout-v3/saldo_aposta.png',
-    lowerOrnament: 'assets/layout-v3/arabesco_baixo.png',
-    turboButton: 'assets/layout-v3/btn_turbo.png',
-    minusButton: 'assets/layout-v3/btn_menos.png',
-    spinButton: 'assets/layout-v3/btn_jogar.png',
-    plusButton: 'assets/layout-v3/btn_mais.png',
-    autoButton: 'assets/layout-v3/btn_auto.png',
-    symbolBag: 'assets/symbols-v2/clean/10_simbolo_saco_fortuna.png',
-    symbolIngot: 'assets/symbols-v2/clean/11_simbolo_lingote.png',
-    symbolCoin: 'assets/symbols-v2/clean/12_simbolo_moeda_chinesa_esquerda.png',
-    symbolWhiteRabbit: 'assets/symbols-v2/clean/14_simbolo_coelho_branco.png',
-    symbolCarrot: 'assets/symbols-v2/clean/15_simbolo_cenoura.png',
-    symbolGoldenRabbit: 'assets/symbols-v2/clean/17_simbolo_coelho_dourado.png',
-    symbolLantern: 'assets/symbols-v2/clean/18_simbolo_lanterna_fortuna.png',
-    symbolWild: 'assets/symbols-v2/clean/wild.png',
-    symbolPrize: 'assets/symbols-v2/clean/simbolo_premio.png',
-    celebration1: 'assets/celebration/clean/animacao_ganhou1.png',
-    celebration2: 'assets/celebration/clean/animacao_ganhou2.png',
-    celebration3: 'assets/celebration/clean/animacao_ganhou3.png',
-    celebration4: 'assets/celebration/clean/animacao_ganhou4.png',
-    celebration5: 'assets/celebration/clean/animacao_ganhou5.png',
-    bigWinTitle: 'assets/celebration/clean/texto_grande_ganho.png',
-    megaWinTitle: 'assets/celebration/clean/texto_mega_ganho.png',
-    idle1: 'assets/idle/clean/animacao_parado1.png',
-    idle2: 'assets/idle/clean/animacao_parado2.png',
-    idle3: 'assets/idle/clean/animacao_parado3.png',
-    idle4: 'assets/idle/clean/animacao_parado4.png',
-    idle5: 'assets/idle/clean/animacao_parado5.png',
-    autoPanel: 'assets/automatic/tela_automatica.png',
-    autoSelection: 'assets/automatic/marcacao_numeros.png',
-    autoSliderKnob: 'assets/automatic/botao_spin.png',
-    autoMinus: 'assets/automatic/menos.png',
-    autoPlus: 'assets/automatic/mais.png',
-    autoClose: 'assets/automatic/fechar_largo.png',
+    sky: 'assets/layout-v3/fundo.webp',
+    roofLeft: 'assets/layout-v3/telhado_esquerda.webp',
+    roofRight: 'assets/layout-v3/telhado_direita.webp',
+    lantern: 'assets/layout-v3/balao_longo.webp',
+    cloud1: 'assets/layout-v3/nuvem1.webp',
+    cloud2: 'assets/layout-v3/nuvem2.webp',
+    cloud3: 'assets/layout-v3/nuvem1.webp',
+    cloud4: 'assets/layout-v3/nuvem2.webp',
+    logo: 'assets/layout-v3/logo.webp',
+    menuButton: 'assets/layout-v3/btn_menu.webp',
+    reelFrame: 'assets/layout-v3/central_rolos.webp',
+    displayFrame: 'assets/layout-v3/display_novo.webp',
+    scoreFrame: 'assets/layout-v3/saldo_aposta.webp',
+    lowerOrnament: 'assets/layout-v3/arabesco_baixo.webp',
+    turboButton: 'assets/layout-v3/btn_turbo.webp',
+    minusButton: 'assets/layout-v3/btn_menos.webp',
+    spinButton: 'assets/layout-v3/btn_jogar.webp',
+    plusButton: 'assets/layout-v3/btn_mais.webp',
+    autoButton: 'assets/layout-v3/btn_auto.webp',
+    symbolBag: 'assets/symbols-v2/clean/10_simbolo_saco_fortuna.webp',
+    symbolIngot: 'assets/symbols-v2/clean/11_simbolo_lingote.webp',
+    symbolCoin: 'assets/symbols-v2/clean/12_simbolo_moeda_chinesa_esquerda.webp',
+    symbolWhiteRabbit: 'assets/symbols-v2/clean/14_simbolo_coelho_branco.webp',
+    symbolCarrot: 'assets/symbols-v2/clean/15_simbolo_cenoura.webp',
+    symbolGoldenRabbit: 'assets/symbols-v2/clean/17_simbolo_coelho_dourado.webp',
+    symbolLantern: 'assets/symbols-v2/clean/18_simbolo_lanterna_fortuna.webp',
+    symbolWild: 'assets/symbols-v2/clean/wild.webp',
+    symbolPrize: 'assets/symbols-v2/clean/simbolo_premio.webp',
+    celebration1: 'assets/celebration/clean/animacao_ganhou1.webp',
+    celebration2: 'assets/celebration/clean/animacao_ganhou2.webp',
+    celebration3: 'assets/celebration/clean/animacao_ganhou3.webp',
+    celebration4: 'assets/celebration/clean/animacao_ganhou4.webp',
+    celebration5: 'assets/celebration/clean/animacao_ganhou5.webp',
+    bigWinTitle: 'assets/celebration/clean/texto_grande_ganho.webp',
+    megaWinTitle: 'assets/celebration/clean/texto_mega_ganho.webp',
+    idle1: 'assets/idle/clean/animacao_parado1.webp',
+    idle2: 'assets/idle/clean/animacao_parado2.webp',
+    idle3: 'assets/idle/clean/animacao_parado3.webp',
+    idle4: 'assets/idle/clean/animacao_parado4.webp',
+    idle5: 'assets/idle/clean/animacao_parado5.webp',
+    autoPanel: 'assets/automatic/tela_automatica.webp',
+    autoSelection: 'assets/automatic/marcacao_numeros.webp',
+    autoSliderKnob: 'assets/automatic/botao_spin.webp',
+    autoMinus: 'assets/automatic/menos.webp',
+    autoPlus: 'assets/automatic/mais.webp',
+    autoClose: 'assets/automatic/fechar_largo.webp',
   };
   const ASSETS = {};
 
@@ -165,6 +165,7 @@
         promise = new Promise((resolve) => {
           const image = new Image();
           let finished = false;
+          let fallbackAttempted = false;
           const finish = (loadedImage = null) => {
             if (finished) return;
             finished = true;
@@ -174,7 +175,14 @@
           const timeout = setTimeout(finish, 6000);
           image.decoding = 'async';
           image.onload = () => finish(image);
-          image.onerror = () => finish();
+          image.onerror = () => {
+            if (!fallbackAttempted && src.endsWith('.webp')) {
+              fallbackAttempted = true;
+              image.src = `${src.replace(/\.webp$/, '.png')}?v=${ASSET_VERSION}`;
+              return;
+            }
+            finish();
+          };
           image.src = `${src}?v=${ASSET_VERSION}`;
         });
         imagePromises.set(src, promise);
@@ -450,6 +458,32 @@
       this.pendingFeature = false;
       const query = new URLSearchParams(window.location.search);
       const demoMode = query.get('demo') || '';
+      this.performanceTelemetry = query.get('perf') === '1'
+        ? {
+          windowStart: performance.now(),
+          lastFrame: 0,
+          frameIntervals: [],
+          renderTimes: [],
+          longTasks: 0,
+          history: [],
+        }
+        : null;
+      this.performanceObserver = null;
+      if (this.performanceTelemetry) {
+        window.__coelhoPerf = {
+          status: 'collecting',
+          profile: this.performanceProfile,
+          latest: null,
+          history: [],
+        };
+        if (typeof PerformanceObserver !== 'undefined'
+          && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+          this.performanceObserver = new PerformanceObserver((list) => {
+            this.performanceTelemetry.longTasks += list.getEntries().length;
+          });
+          this.performanceObserver.observe({ type: 'longtask', buffered: true });
+        }
+      }
       this.forceFeature = demoMode === 'feature';
       this.forceLines = demoMode === 'lines';
       this.forceLine1 = demoMode === 'line1';
@@ -769,9 +803,58 @@
       const dt = Math.min(40, time - this.lastTime);
       this.lastTime = time;
       this.lastFrameDraw = time;
+      const renderStarted = this.performanceTelemetry ? performance.now() : 0;
       this.update(time, dt);
       this.draw(time);
+      if (this.performanceTelemetry) {
+        this.recordPerformanceFrame(time, performance.now() - renderStarted);
+      }
       requestAnimationFrame(this.frameBound);
+    }
+
+    recordPerformanceFrame(time, renderDuration) {
+      const telemetry = this.performanceTelemetry;
+      if (!telemetry) return;
+      if (telemetry.lastFrame) telemetry.frameIntervals.push(time - telemetry.lastFrame);
+      telemetry.lastFrame = time;
+      telemetry.renderTimes.push(renderDuration);
+      const elapsed = time - telemetry.windowStart;
+      if (elapsed < 5000) return;
+
+      const percentile = (values, ratio) => {
+        if (!values.length) return 0;
+        const sorted = values.slice().sort((a, b) => a - b);
+        return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))];
+      };
+      const frameBudget = 1000 / this.performanceProfile.targetFps;
+      const droppedFrames = telemetry.frameIntervals.filter((interval) => interval > frameBudget * 1.5).length;
+      const summary = {
+        capturedAt: new Date().toISOString(),
+        durationMs: Math.round(elapsed),
+        targetFps: this.performanceProfile.targetFps,
+        fps: Number((telemetry.renderTimes.length * 1000 / elapsed).toFixed(1)),
+        frameTimeP95: Number(percentile(telemetry.frameIntervals, 0.95).toFixed(2)),
+        renderTimeP95: Number(percentile(telemetry.renderTimes, 0.95).toFixed(2)),
+        droppedFrames,
+        droppedRatio: Number((droppedFrames / Math.max(1, telemetry.frameIntervals.length)).toFixed(3)),
+        longTasks: telemetry.longTasks,
+        profile: this.performanceProfile,
+      };
+      telemetry.history.push(summary);
+      if (telemetry.history.length > 12) telemetry.history.shift();
+      window.__coelhoPerf = {
+        status: 'ready',
+        profile: this.performanceProfile,
+        latest: summary,
+        history: telemetry.history.slice(),
+      };
+      document.documentElement.dataset.coelhoPerf = JSON.stringify(summary);
+      console.info(`[CoelhoGame perf] ${JSON.stringify(summary)}`);
+      telemetry.windowStart = time;
+      telemetry.lastFrame = 0;
+      telemetry.frameIntervals.length = 0;
+      telemetry.renderTimes.length = 0;
+      telemetry.longTasks = 0;
     }
 
     update(time, dt) {
@@ -2123,7 +2206,9 @@
     }
 
     drawFeatureHud(time) {
-      if (!this.isFortuneActive() || this.state.startsWith('FEATURE_')) return;
+      // A entrada da feature precisa ser lida antes do contador. O HUD só
+      // aparece quando a animação "Coelho da Fortuna" termina.
+      if (!this.isFortuneActive() || this.pendingFeature || this.state.startsWith('FEATURE_')) return;
       const ctx = this.ctx;
       const currentRound = clamp(this.featureSpinIndex || 1, 1, FEATURE_SPINS);
       const visibleTotal = this.getVisibleFeatureTotal(time);
@@ -2236,27 +2321,6 @@
         ctx.stroke();
       }
 
-      if (intro) {
-        for (let index = 0; index < FEATURE_SPINS; index += 1) {
-          const angle = time * 0.00055 + index * TAU / FEATURE_SPINS;
-          const orbit = 205 + Math.sin(time * 0.002 + index) * 12;
-          const x = 390 + Math.cos(angle) * orbit;
-          const y = 735 + Math.sin(angle) * orbit * 0.72;
-          ctx.globalAlpha = appear * (0.72 + Math.sin(time * 0.008 + index) * 0.2);
-          ctx.fillStyle = index % 2 ? '#9dffd1' : '#ffe26c';
-          ctx.shadowColor = ctx.fillStyle;
-          ctx.shadowBlur = 18;
-          ctx.beginPath();
-          ctx.arc(x, y, 11, 0, TAU);
-          ctx.fill();
-          ctx.fillStyle = '#55265f';
-          ctx.font = '900 12px Arial Black, Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(String(index + 1), x, y + 1);
-        }
-      }
-
       ctx.restore();
       const outroElapsed = Math.max(0, time - this.featureOutroStart);
       const featureMascot = intro
@@ -2273,6 +2337,34 @@
         ctx.restore();
       } else {
         this.drawRabbitActor(time, 390, 720, 1.28 * appear * pulse);
+      }
+
+      if (intro) {
+        // Marcadores em anel externo, desenhados depois do mascote. Assim
+        // todos os oito números permanecem legíveis durante a animação.
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (let index = 0; index < FEATURE_SPINS; index += 1) {
+          const angle = time * 0.00055 + index * TAU / FEATURE_SPINS;
+          const orbit = 258 + Math.sin(time * 0.002 + index) * 10;
+          const x = 390 + Math.cos(angle) * orbit;
+          const y = 735 + Math.sin(angle) * orbit * 0.86;
+          const markerAlpha = appear * (0.8 + Math.sin(time * 0.008 + index) * 0.16);
+          const markerColor = index % 2 ? '#9dffd1' : '#ffe26c';
+          ctx.globalAlpha = markerAlpha;
+          ctx.fillStyle = markerColor;
+          ctx.shadowColor = markerColor;
+          ctx.shadowBlur = 20;
+          ctx.beginPath();
+          ctx.arc(x, y, 17, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#55265f';
+          ctx.shadowBlur = 5;
+          ctx.font = '900 18px Arial Black, Arial';
+          ctx.fillText(String(index + 1), x, y + 1);
+        }
+        ctx.restore();
       }
 
       ctx.save();
@@ -2297,22 +2389,18 @@
         ctx.strokeText('SOMENTE SÍMBOLOS DE PRÊMIO', 390, 1252);
         ctx.fillText('SOMENTE SÍMBOLOS DE PRÊMIO', 390, 1252);
       } else {
-        const zeroProgress = clamp((time - this.featureOutroStart) / 650, 0, 1);
-        const zeroScale = easeOutBack(zeroProgress);
-        ctx.save();
-        ctx.translate(390, 945);
-        ctx.scale(zeroScale, zeroScale);
-        ctx.font = '900 68px Arial Black, Arial';
-        ctx.strokeText('0 RODADAS', 0, 0);
-        ctx.fillText('0 RODADAS', 0, 0);
-        ctx.restore();
         const countProgress = easeOutCubic(clamp((time - this.featureOutroStart - 240) / 1350, 0, 1));
         ctx.font = '900 72px Arial Black, Arial';
+        ctx.strokeStyle = '#6d193d';
+        ctx.fillStyle = '#ffe570';
         ctx.strokeText(money(this.featureTotal * countProgress), 390, 1120);
         ctx.fillText(money(this.featureTotal * countProgress), 390, 1120);
-        ctx.font = '700 28px Arial';
-        ctx.fillStyle = this.featureLimitReached ? '#fff09a' : '#fff6da';
+        ctx.font = '900 38px Arial Black, Arial';
+        ctx.strokeStyle = '#31104b';
+        ctx.fillStyle = this.featureLimitReached ? '#9dffd1' : '#ff9b63';
+        ctx.lineWidth = 9;
         ctx.fillText(this.featureLimitReached ? 'LIMITE MÁXIMO 5000x' : 'GANHO ACUMULADO', 390, 1180);
+        ctx.strokeText(this.featureLimitReached ? 'LIMITE MÁXIMO 5000x' : 'GANHO ACUMULADO', 390, 1180);
       }
       ctx.restore();
     }
@@ -3603,13 +3691,12 @@
       ctx.restore();
 
       const betCenterX = panel.x + panel.w * 0.75;
-      const hasBetLevel = this.level > 1 && this.level < 10;
-      if (hasBetLevel) {
-        // "APOSTA" já vem no painel. O nível fica ao lado, formando um único título.
-        ctx.fillStyle = '#ffe16a';
-        ctx.font = '900 24px Arial Black, Arial';
-        ctx.fillText(String(this.level), betCenterX + 55, 1393);
-      }
+      // O painel já traz o título "APOSTA" na arte. O nível precisa aparecer
+      // para toda a faixa válida, inclusive nos limites 1 e 10.
+      const hasBetLevel = true;
+      ctx.fillStyle = '#ffe16a';
+      ctx.font = '900 24px Arial Black, Arial';
+      ctx.fillText(String(this.level), betCenterX + 55, 1393);
       ctx.fillStyle = '#fff9e5';
       ctx.font = '900 25px Arial Black, Arial';
       // Mantém o valor na mesma linha, peso e escala do saldo.
@@ -3771,17 +3858,18 @@
       ctx.shadowBlur = 0;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      const finalRound = remaining <= 0;
       ctx.fillStyle = '#fff2aa';
       ctx.font = '900 16px Arial Black, Arial';
-      ctx.fillText('FORTUNA', 0, -33);
+      ctx.fillText(finalRound ? 'RODADA' : 'FORTUNA', 0, -33);
       ctx.strokeStyle = '#32104f';
       ctx.lineWidth = 7;
       ctx.font = '900 54px Arial Black, Arial';
-      ctx.strokeText(String(Math.max(0, remaining)), 0, 6);
-      ctx.fillText(String(Math.max(0, remaining)), 0, 6);
+      ctx.strokeText(finalRound ? 'FINAL' : String(remaining), 0, 6);
+      ctx.fillText(finalRound ? 'FINAL' : String(remaining), 0, 6);
       ctx.fillStyle = '#d8ffe6';
       ctx.font = '800 12px Arial, sans-serif';
-      ctx.fillText(remaining === 1 ? 'RODADA' : 'RODADAS', 0, 44);
+      ctx.fillText(finalRound ? 'BOA SORTE' : remaining === 1 ? 'RODADA' : 'RODADAS', 0, 44);
       ctx.restore();
     }
 
