@@ -36,7 +36,23 @@ const normalGrid = core.makeGrid(false, seeded(10));
 assert.deepEqual(normalGrid.map((column) => column.length), [3, 4, 3]);
 
 const featureGrid = core.makeGrid(true, seeded(20));
-assert.ok(featureGrid.flat().every((symbol) => symbol.type === 'prize'));
+const featurePrizeCount = featureGrid.flat().filter((symbol) => symbol.type === 'prize').length;
+assert.ok(featurePrizeCount >= 1 && featurePrizeCount <= 10);
+assert.ok(featureGrid.flat().every((symbol) => ['prize', 'empty'].includes(symbol.type)));
+
+const losingFeatureGrid = core.makeFeatureGrid(seeded(21), 4);
+const losingFeatureResult = core.evaluateGrid(losingFeatureGrid, bet, lineStake);
+assert.equal(losingFeatureResult.prizes.length, 4);
+assert.equal(losingFeatureResult.total, 0, 'quatro símbolos de prêmio não devem pagar');
+
+const winningFeatureGrid = core.makeFeatureGrid(seeded(22), 5);
+const winningFeatureResult = core.evaluateGrid(winningFeatureGrid, bet, lineStake);
+assert.equal(winningFeatureResult.prizes.length, 5);
+assert.ok(winningFeatureResult.total > 0, 'cinco símbolos de prêmio devem pagar');
+
+const featurePlan = core.makeFeaturePlan(8, () => 0);
+assert.equal(featurePlan.length, 8);
+assert.ok(featurePlan.some((count) => count < 5), 'as oito rodadas não podem premiar todas');
 
 const mixedGrid = core.makeMixedWinGrid(seeded(33));
 const mixedResult = core.evaluateGrid(mixedGrid, bet, lineStake);

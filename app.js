@@ -24,7 +24,7 @@
   const FEATURE_MAX_MULTIPLIER = 5000;
   const FEATURE_INTRO_DURATION = 2600;
   const FEATURE_OUTRO_DURATION = 3200;
-  const ASSET_VERSION = '28';
+  const ASSET_VERSION = '31';
   const getPerformanceProfile = () => {
     const coarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -73,6 +73,8 @@
     FEATURE_TRIGGER_RATE,
     evaluateGrid,
     applyFeatureWin,
+    makeFeatureGrid,
+    makeFeaturePlan,
     makeMixedWinGrid,
   } = window.CoelhoMath;
   const REEL_LAYOUT = [
@@ -133,6 +135,9 @@
     symbolLantern: 'assets/symbols-v2/clean/18_simbolo_lanterna_fortuna.webp',
     symbolWild: 'assets/symbols-v2/clean/wild.webp',
     symbolPrize: 'assets/symbols-v2/clean/simbolo_premio.webp',
+    featureFiveToWin: 'assets/layout-v3/5iguais.png',
+    featureSpinPanel: 'assets/feature/rodando.png',
+    featureSpinPanelBlur: 'assets/feature/rodando2.png',
     celebration1: 'assets/celebration/clean/animacao_ganhou1.webp',
     celebration2: 'assets/celebration/clean/animacao_ganhou2.webp',
     celebration3: 'assets/celebration/clean/animacao_ganhou3.webp',
@@ -448,6 +453,7 @@
       this.featureBet = 0;
       this.featureMaximum = 0;
       this.featureSpinIndex = 0;
+      this.featurePrizePlan = [];
       this.featureRoundStartTotal = 0;
       this.featureRoundWin = 0;
       this.featureCollectStart = 0;
@@ -455,6 +461,7 @@
       this.featureIntroStart = 0;
       this.featureOutroStart = 0;
       this.activeFeatureSpin = false;
+      this.featureAutoPlay = false;
       this.pendingFeature = false;
       const query = new URLSearchParams(window.location.search);
       const demoMode = query.get('demo') || '';
@@ -667,6 +674,10 @@
 
     makeGrid(feature = false, bet = this.bet) {
       return this.freezePrizeValues(window.CoelhoMath.makeGrid(feature), bet);
+    }
+
+    makeFeatureGrid(prizeCount, bet = this.bet) {
+      return this.freezePrizeValues(makeFeatureGrid(Math.random, prizeCount), bet);
     }
 
     freezePrizeValues(grid, bet = this.bet) {
@@ -923,8 +934,10 @@
 
       if (this.state === 'FEATURE_INTRO' && time - this.featureIntroStart > FEATURE_INTRO_DURATION) {
         this.state = 'IDLE';
-        this.message = `RODADAS DA FORTUNA ${FEATURE_SPINS}`;
-        setTimeout(() => this.spin(), 220);
+        this.message = 'COELHO DA FORTUNA';
+        if (this.featureAutoPlay && this.autoActive) setTimeout(() => {
+          if (this.state === 'IDLE' && this.featureAutoPlay && this.autoActive && this.featureRemaining > 0) this.spin();
+        }, 220);
       }
 
       if (this.state === 'FEATURE_OUTRO' && time - this.featureOutroStart > FEATURE_OUTRO_DURATION) {
@@ -933,11 +946,14 @@
         this.checkAutoLimits(this.featureTotal);
         const resumeAuto = this.autoActive && this.autoRemaining > 0;
         this.activeFeatureSpin = false;
+        this.featureAutoPlay = false;
         this.featureBet = 0;
         this.featureSpinIndex = 0;
+        this.featurePrizePlan = [];
         if (resumeAuto) setTimeout(() => {
           if (this.state === 'IDLE' && this.autoActive && this.autoRemaining > 0) this.spin();
         }, this.turbo ? 140 : 460);
+        else this.autoActive = false;
       }
     }
 
@@ -1162,6 +1178,16 @@
       this.completeBalanceTransfer();
       if (this.lastWin > 0) this.advancePanel(time);
       if (this.pendingFeature) {
+        this.featureAutoPlay = this.autoActive;
+        this.featureRemaining = FEATURE_SPINS;
+        this.featureTotal = 0;
+        this.featureBet = this.spinBet;
+        this.featureMaximum = FEATURE_MAX_MULTIPLIER * this.spinBet;
+        this.featureSpinIndex = 0;
+        this.featurePrizePlan = makeFeaturePlan(FEATURE_SPINS);
+        this.featureRoundStartTotal = 0;
+        this.featureRoundWin = 0;
+        this.featureLimitReached = false;
         this.pendingFeature = false;
         this.featureIntroStart = time;
         this.state = 'FEATURE_INTRO';
@@ -1182,11 +1208,16 @@
         return;
       }
       this.state = 'IDLE';
-      this.message = this.featureRemaining ? `RODADAS DA FORTUNA ${this.featureRemaining}` : 'BOA SORTE!';
-      if (!this.autoRemaining) this.autoActive = false;
-      if (this.autoRemaining > 0 || this.featureRemaining > 0) {
+      this.message = this.featureRemaining ? 'COELHO DA FORTUNA' : 'BOA SORTE!';
+      if (!this.autoRemaining && !this.featureRemaining) this.autoActive = false;
+      const continueAutomatically = this.featureRemaining > 0
+        ? this.featureAutoPlay && this.autoActive
+        : this.autoActive && this.autoRemaining > 0;
+      if (continueAutomatically) {
         setTimeout(() => {
-          if (this.featureRemaining > 0 || (this.autoActive && this.autoRemaining > 0)) this.spin();
+          const canContinueFeature = this.featureRemaining > 0 && this.featureAutoPlay && this.autoActive;
+          const canContinueAuto = !this.featureRemaining && this.autoActive && this.autoRemaining > 0;
+          if (canContinueFeature || canContinueAuto) this.spin();
         }, this.turbo ? 120 : 420);
       }
     }
@@ -1211,7 +1242,12 @@
       if (!featureSpin && this.autoRemaining > 0) this.autoRemaining -= 1;
       this.lastWin = 0;
       this.result = { total: 0, lines: [], cells: [], prizes: [] };
-      this.grid = featureSpin ? this.makeGrid(true, this.spinBet) : this.makeShowcaseGrid();
+      const featurePrizeCount = featureSpin
+        ? (this.featurePrizePlan[this.featureSpinIndex - 1] || 1)
+        : 0;
+      this.grid = featureSpin
+        ? this.makeFeatureGrid(featurePrizeCount, this.spinBet)
+        : this.makeShowcaseGrid();
       if (this.forceLines && !featureSpin) {
         this.grid = [3, 4, 3].map((rows) => Array.from({ length: rows }, () => ({ type: 'rockets', prize: 0 })));
       }
@@ -1319,18 +1355,6 @@
       this.winVisualVariant = (this.winVisualVariant + 1 + Math.floor(Math.random() * 2)) % 3;
       this.celebrateWin = this.winTier !== 'small';
 
-      if (this.pendingFeature && this.featureRemaining === 0) {
-        this.featureRemaining = FEATURE_SPINS;
-        this.featureTotal = 0;
-        this.featureBet = this.spinBet;
-        this.featureMaximum = FEATURE_MAX_MULTIPLIER * this.spinBet;
-        this.featureSpinIndex = 0;
-        this.featureRoundStartTotal = 0;
-        this.featureRoundWin = 0;
-        this.featureLimitReached = false;
-        this.message = 'COELHO DA FORTUNA — 8 RODADAS!';
-      }
-
       this.history.unshift({
         time: new Date(),
         bet: this.activeFeatureSpin ? 0 : this.spinBet,
@@ -1343,23 +1367,18 @@
 
       if (this.result.total > 0) {
         this.state = 'WIN';
-        this.message = this.pendingFeature ? '8 RODADAS DA FORTUNA!' : `GANHO ${money(this.result.total)}`;
+        this.message = `GANHO ${money(this.result.total)}`;
         this.activatePanelItem({
           text: `WIN ${money(this.result.total)}`,
           mode: 'center',
           duration: (this.getWinTiming().totalDuration + 1000) / 1.6,
         }, time);
-        if (this.pendingFeature) this.enqueuePanel('8 RODADAS DA FORTUNA!', 'center', 3400);
         this.announce(`Você ganhou ${money(this.result.total)}`);
       } else {
-        this.state = this.pendingFeature ? 'WIN' : 'NO_WIN';
-        this.message = this.pendingFeature ? '8 RODADAS DA FORTUNA!' : 'TENTE NOVAMENTE';
-        this.enqueuePanel(this.message, 'center', this.pendingFeature ? 3400 : 2600);
-        if (this.pendingFeature) {
-          this.sound.win(true);
-          this.burst(W / 2, 1130, 70, '#ffd44d');
-        }
-        this.announce(this.pendingFeature ? 'Coelho da Fortuna ativado com oito rodadas' : 'Sem prêmio neste giro');
+        this.state = 'NO_WIN';
+        this.message = 'TENTE NOVAMENTE';
+        this.enqueuePanel(this.message, 'center', 2600);
+        this.announce('Sem prêmio neste giro');
       }
     }
 
@@ -1377,6 +1396,7 @@
       if (!this.autoActive) return;
       this.autoRemaining = 0;
       this.autoActive = false;
+      this.featureAutoPlay = false;
       this.autoTotal = 0;
       this.message = message;
       this.enqueuePanel(message, 'center', 3000);
@@ -2014,7 +2034,7 @@
     }
 
     drawFeatureReelAtmosphere(time) {
-      if (!this.isFortuneActive()) return;
+      if (!this.isFortuneActive() || this.pendingFeature || this.state === 'FEATURE_INTRO') return;
       const ctx = this.ctx;
       REEL_LAYOUT.forEach((reel, reelIndex) => {
         ctx.save();
@@ -2102,13 +2122,29 @@
           bounce = (easeOutBack(progress) - 1) * 24;
         }
 
-        if (reel.stopped) {
+        if (reel.stopped && this.activeFeatureSpin) {
           this.grid[reel.index].forEach((symbol, row) => {
-            const flip = this.activeFeatureSpin
-              ? clamp((time - reel.bounceStart - row * 85) / 260, 0.02, 1)
-              : 1;
-            this.drawSymbol(symbol, reel, row, reel.y + row * reel.cellH + bounce, 1, false, flip);
+            const targetY = reel.y + row * reel.cellH + bounce;
+            this.drawFeatureSpinPanel(reel, targetY, false, 1);
+            if (symbol.type !== 'prize') return;
+            const delay = row * (this.turbo ? 38 : 90);
+            const duration = this.turbo ? 190 : 390;
+            const progress = clamp((time - reel.bounceStart - delay) / duration, 0, 1);
+            if (progress <= 0) return;
+            const eased = easeOutBack(progress);
+            const dropDistance = reel.h + reel.cellH * (0.35 + row * 0.08);
+            const prizeY = targetY - (1 - eased) * dropDistance;
+            this.drawSymbol(symbol, reel, row, prizeY, 1, false, 1);
           });
+        } else if (reel.stopped) {
+          this.grid[reel.index].forEach((symbol, row) => {
+            this.drawSymbol(symbol, reel, row, reel.y + row * reel.cellH + bounce, 1, false, 1);
+          });
+        } else if (this.activeFeatureSpin) {
+          for (let row = -1; row <= reel.rows; row += 1) {
+            const y = reel.y + row * reel.cellH + reel.offset - reel.cellH;
+            this.drawFeatureSpinPanel(reel, y, true, 0.96);
+          }
         } else {
           const base = Math.floor((time - this.spinStart) / 95 + reel.index * 4);
           for (let row = -1; row <= reel.rows; row += 1) {
@@ -2119,6 +2155,28 @@
         }
         ctx.restore();
       });
+    }
+
+    drawFeatureSpinPanel(reel, y, moving = false, alpha = 1) {
+      const ctx = this.ctx;
+      const image = moving
+        ? (ASSETS.featureSpinPanelBlur || ASSETS.featureSpinPanel)
+        : ASSETS.featureSpinPanel;
+      const w = reel.w - 10;
+      const h = reel.cellH - 7;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      if (image) {
+        const rect = this.imageContainRect(image, reel.x + reel.w / 2, y + h / 2, w, h);
+        if (rect) ctx.drawImage(image, rect.x, rect.y, rect.w, rect.h);
+      } else {
+        const gradient = ctx.createLinearGradient(0, y, 0, y + h);
+        gradient.addColorStop(0, '#b62a24');
+        gradient.addColorStop(0.5, '#741516');
+        gradient.addColorStop(1, '#a52420');
+        this.roundRect(reel.x + 7, y + 2, w - 4, h - 4, 8, gradient, '#e45533', 2);
+      }
+      ctx.restore();
     }
 
     drawSymbol(symbol, reel, row, y, alpha, moving = false, flip = 1, emphasis = 1) {
@@ -2142,8 +2200,9 @@
           ? symbol.prizeAmount
           : (symbol.prize || 0.5) * this.spinBet;
         this.drawPrize(0, 0, amount, w, h, { feature: this.activeFeatureSpin });
+      } else if (symbol.type !== 'empty') {
+        this.drawAssetSymbol(symbol.type, 0, 0, w * 0.96, h * 0.94, reel.index);
       }
-      else this.drawAssetSymbol(symbol.type, 0, 0, w * 0.96, h * 0.94, reel.index);
       ctx.strokeStyle = '#f4be6822';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -2210,40 +2269,13 @@
       // aparece quando a animação "Coelho da Fortuna" termina.
       if (!this.isFortuneActive() || this.pendingFeature || this.state.startsWith('FEATURE_')) return;
       const ctx = this.ctx;
-      const currentRound = clamp(this.featureSpinIndex || 1, 1, FEATURE_SPINS);
-      const visibleTotal = this.getVisibleFeatureTotal(time);
-      const pulse = 1 + Math.sin(time * 0.0065) * 0.012;
-      const x = 390;
-      const y = 363;
+      const pulse = 1 + Math.sin(time * 0.0048) * 0.014;
       ctx.save();
-      ctx.translate(x, y);
+      ctx.translate(390, 363);
       ctx.scale(pulse, pulse);
-      const glow = ctx.createRadialGradient(0, 0, 8, 0, 0, 230);
-      glow.addColorStop(0, 'rgba(255,230,112,0.38)');
-      glow.addColorStop(1, 'rgba(119,42,129,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(-255, -60, 510, 120);
-      this.roundRect(-218, -30, 436, 60, 28, '#25104eea', '#ffd55c', 4);
-      ctx.shadowColor = '#ffca55';
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = '#fff0a0';
-      ctx.textBaseline = 'middle';
-      ctx.font = '900 20px Arial Black, Arial';
-      ctx.textAlign = 'left';
-      ctx.fillText(`RODADA ${currentRound}/${FEATURE_SPINS}`, -192, -2);
-      ctx.textAlign = 'right';
-      ctx.fillStyle = this.featureLimitReached ? '#fff5a3' : '#9fffd1';
-      ctx.fillText(this.featureLimitReached ? 'LIMITE 5000x' : `FORTUNA ${money(visibleTotal)}`, 192, -2);
-      ctx.shadowBlur = 0;
-
-      const segmentWidth = 42;
-      for (let index = 0; index < FEATURE_SPINS; index += 1) {
-        const completed = index < currentRound;
-        const segmentX = -191 + index * (segmentWidth + 7);
-        ctx.fillStyle = completed ? '#ffd65a' : '#563274';
-        ctx.globalAlpha = completed ? 1 : 0.72;
-        this.roundRect(segmentX, 17, segmentWidth, 5, 3, ctx.fillStyle);
-      }
+      ctx.shadowColor = '#ffd45c';
+      ctx.shadowBlur = 13;
+      this.drawImageContain(ASSETS.featureFiveToWin, 0, 0, 320, 103);
       ctx.restore();
     }
 
@@ -2383,11 +2415,24 @@
         ctx.font = '900 38px Arial Black, Arial';
         ctx.strokeText('RODADAS DA FORTUNA', 390, 1200);
         ctx.fillText('RODADAS DA FORTUNA', 390, 1200);
-        ctx.font = '800 25px Arial, sans-serif';
-        ctx.fillStyle = '#d8ffe8';
-        ctx.lineWidth = 6;
-        ctx.strokeText('SOMENTE SÍMBOLOS DE PRÊMIO', 390, 1252);
-        ctx.fillText('SOMENTE SÍMBOLOS DE PRÊMIO', 390, 1252);
+        if (ASSETS.featureFiveToWin) {
+          const bannerAppear = easeOutBack(clamp((progress - 0.42) / 0.3, 0, 1));
+          ctx.save();
+          ctx.translate(390, 1280);
+          ctx.scale(bannerAppear, bannerAppear);
+          ctx.globalAlpha = appear;
+          ctx.globalCompositeOperation = 'screen';
+          ctx.shadowColor = '#ffcf54';
+          ctx.shadowBlur = 18 + Math.sin(time * 0.01) * 5;
+          this.drawImageContain(ASSETS.featureFiveToWin, 0, 0, 500, 162);
+          ctx.restore();
+        } else {
+          ctx.font = '800 25px Arial, sans-serif';
+          ctx.fillStyle = '#d8ffe8';
+          ctx.lineWidth = 6;
+          ctx.strokeText('5 SÍMBOLOS PARA GANHAR', 390, 1260);
+          ctx.fillText('5 SÍMBOLOS PARA GANHAR', 390, 1260);
+        }
       } else {
         const countProgress = easeOutCubic(clamp((time - this.featureOutroStart - 240) / 1350, 0, 1));
         ctx.font = '900 72px Arial Black, Arial';
@@ -3801,12 +3846,17 @@
       });
 
       const spinBusy = this.state === 'SPIN_LOOP';
-      const fortuneActive = this.activeFeatureSpin || this.featureRemaining > 0;
-      const fortuneCount = this.featureRemaining + (this.activeFeatureSpin && spinBusy ? 1 : 0);
+      const featureOpening = this.pendingFeature || this.state === 'FEATURE_INTRO';
+      const fortuneActive = !featureOpening && (this.activeFeatureSpin || this.featureRemaining > 0);
+      const fortuneRound = clamp(
+        this.featureSpinIndex + (this.state === 'IDLE' && this.featureRemaining > 0 ? 1 : 0),
+        1,
+        FEATURE_SPINS,
+      );
       const idlePulse = spinBusy ? 1 : 1 + Math.sin(time * 0.0038) * 0.011;
       const pressedScale = this.pressScale('spin', time);
       if (fortuneActive) {
-        this.drawFortuneIndicator(time, fortuneCount, pressedScale, spinBusy);
+        this.drawFortuneIndicator(time, fortuneRound, pressedScale, spinBusy, this.featureAutoPlay && this.autoActive);
       } else if (this.autoActive) {
         this.drawAutoIndicator(time, Math.max(0, this.autoRemaining), pressedScale, spinBusy);
       } else {
@@ -3821,7 +3871,7 @@
       this.hit(293, 1491, 194, 194, this.spinControlAction, 'spin');
     }
 
-    drawFortuneIndicator(time, remaining, pressedScale, spinning) {
+    drawFortuneIndicator(time, round, pressedScale, spinning, automatic) {
       const ctx = this.ctx;
       const pulse = 1 + Math.sin(time * 0.008) * (spinning ? 0.025 : 0.014);
       ctx.save();
@@ -3845,7 +3895,7 @@
       ctx.rotate(spinning ? this.spinButtonAngle : time * 0.00018);
       for (let index = 0; index < FEATURE_SPINS; index += 1) {
         const angle = -Math.PI / 2 + index * TAU / FEATURE_SPINS;
-        const active = index < remaining;
+        const active = index < round;
         ctx.fillStyle = active ? '#fff09a' : '#5b3473';
         ctx.shadowColor = active ? '#ffd24f' : 'transparent';
         ctx.shadowBlur = active ? 9 : 0;
@@ -3858,18 +3908,18 @@
       ctx.shadowBlur = 0;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const finalRound = remaining <= 0;
       ctx.fillStyle = '#fff2aa';
       ctx.font = '900 16px Arial Black, Arial';
-      ctx.fillText(finalRound ? 'RODADA' : 'FORTUNA', 0, -33);
+      ctx.fillText('RODADA', 0, -33);
       ctx.strokeStyle = '#32104f';
       ctx.lineWidth = 7;
-      ctx.font = '900 54px Arial Black, Arial';
-      ctx.strokeText(finalRound ? 'FINAL' : String(remaining), 0, 6);
-      ctx.fillText(finalRound ? 'FINAL' : String(remaining), 0, 6);
+      ctx.font = '900 45px Arial Black, Arial';
+      const roundLabel = `${round}/${FEATURE_SPINS}`;
+      ctx.strokeText(roundLabel, 0, 6);
+      ctx.fillText(roundLabel, 0, 6);
       ctx.fillStyle = '#d8ffe6';
-      ctx.font = '800 12px Arial, sans-serif';
-      ctx.fillText(finalRound ? 'BOA SORTE' : remaining === 1 ? 'RODADA' : 'RODADAS', 0, 44);
+      ctx.font = '800 11px Arial, sans-serif';
+      ctx.fillText(automatic ? 'AUTOMÁTICA' : 'CLIQUE PARA JOGAR', 0, 44);
       ctx.restore();
     }
 

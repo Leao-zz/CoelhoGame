@@ -28,6 +28,7 @@
   const PRIZE_RATE = 0.035;
   const WILD_RATE = 0.012;
   const FEATURE_TRIGGER_RATE = 0.00024;
+  const FEATURE_WIN_RATE = 0.46;
   const PRIZE_VALUES = [0.5, 1, 2, 3, 5, 10, 15, 20, 25, 50, 100, 250, 500];
   const PRIZE_WEIGHTS = [28, 22, 16, 10, 8, 6, 3, 2, 2, 1.4, 0.8, 0.35, 0.1];
 
@@ -41,7 +42,7 @@
   }
 
   function randomSymbol(feature = false, random = Math.random) {
-    if (feature) return 'prize';
+    if (feature) return random() < 0.5 ? 'prize' : 'empty';
     const roll = random();
     if (roll < PRIZE_RATE) return 'prize';
     if (roll < PRIZE_RATE + WILD_RATE) return 'wild';
@@ -49,10 +50,37 @@
   }
 
   function makeGrid(feature = false, random = Math.random) {
+    if (feature) return makeFeatureGrid(random);
     return [3, 4, 3].map((rows) => Array.from({ length: rows }, () => {
       const type = randomSymbol(feature, random);
       return { type, prize: type === 'prize' ? randomPrize(random) : 0 };
     }));
+  }
+
+  function randomFeaturePrizeCount(random = Math.random) {
+    if (random() < FEATURE_WIN_RATE) return 5 + Math.floor(random() * 6);
+    return 1 + Math.floor(random() * 4);
+  }
+
+  function makeFeatureGrid(random = Math.random, requestedPrizeCount = randomFeaturePrizeCount(random)) {
+    const prizeCount = Math.max(1, Math.min(10, Math.floor(requestedPrizeCount)));
+    const grid = [3, 4, 3].map((rows) => Array.from({ length: rows }, () => ({ type: 'empty', prize: 0 })));
+    const cells = [];
+    grid.forEach((column, c) => column.forEach((_, r) => cells.push({ c, r })));
+    shuffled(cells, random).slice(0, prizeCount).forEach(({ c, r }) => {
+      grid[c][r] = { type: 'prize', prize: randomPrize(random) };
+    });
+    return grid;
+  }
+
+  function makeFeaturePlan(spins = 8, random = Math.random) {
+    const count = Math.max(1, Math.floor(spins));
+    const plan = Array.from({ length: count }, () => randomFeaturePrizeCount(random));
+    // Bônus nunca paga em todas as rodadas: pelo menos uma deve ter somente 1–4 prêmios.
+    if (plan.every((prizeCount) => prizeCount >= 5)) {
+      plan[Math.floor(random() * plan.length)] = 1 + Math.floor(random() * 4);
+    }
+    return plan;
   }
 
   function shuffled(values, random = Math.random) {
@@ -101,7 +129,7 @@
 
     PAYLINES.forEach((line, index) => {
       const picked = line.map((row, column) => grid[column][row].type);
-      if (picked.includes('prize')) return;
+      if (picked.includes('prize') || picked.includes('empty')) return;
       const base = picked.find((type) => type !== 'wild') || 'wild';
       if (!picked.every((type) => type === base || type === 'wild')) return;
       const amount = SYMBOLS[base].payout * lineStake;
@@ -159,8 +187,9 @@
       if (random() < FEATURE_TRIGGER_RATE) {
         features += 1;
         let featureTotal = 0;
+        const featurePlan = makeFeaturePlan(8, random);
         for (let featureSpin = 0; featureSpin < 8; featureSpin += 1) {
-          const result = evaluateGrid(makeGrid(true, random), bet, lineStake);
+          const result = evaluateGrid(makeFeatureGrid(random, featurePlan[featureSpin]), bet, lineStake);
           const accounting = applyFeatureWin(featureTotal, result.total, bet);
           won += accounting.awarded;
           featureTotal = accounting.total;
@@ -179,10 +208,14 @@
     PRIZE_RATE,
     WILD_RATE,
     FEATURE_TRIGGER_RATE,
+    FEATURE_WIN_RATE,
     PRIZE_VALUES,
     randomPrize,
     randomSymbol,
     makeGrid,
+    randomFeaturePrizeCount,
+    makeFeatureGrid,
+    makeFeaturePlan,
     makeMixedWinGrid,
     evaluateGrid,
     applyFeatureWin,

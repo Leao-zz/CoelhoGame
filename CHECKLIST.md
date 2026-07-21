@@ -303,9 +303,15 @@ Legenda:
 - [x] Implementar ativação aleatória.
 - [x] Implementar entrada cinematográfica.
 - [x] Mostrar texto “8 Rodadas da Fortuna”.
-- [x] Mostrar contador central de rodadas.
-- [x] Executar 8 rodadas automáticas.
-- [x] Mostrar somente símbolos de Prêmio.
+- [x] Mostrar aviso visual de que 5 símbolos de Prêmio são necessários para ganhar.
+- [x] Animar placas vermelhas descendo durante as Rodadas da Fortuna.
+- [x] Parar os três rolos da feature em sequência e revelar placas premiadas por queda.
+- [x] Ocultar contador e indicador da feature até concluir a animação de entrada.
+- [x] Mostrar aviso “5 símbolos para ganhar” no painel superior durante toda a feature.
+- [x] Mostrar progresso `RODADA X/8` dentro do botão central da feature.
+- [x] Exigir clique no botão central para cada rodada quando a feature foi ativada em modo manual.
+- [x] Executar as oito rodadas em sequência somente quando a feature foi ativada durante Rodada Automática.
+- [x] Na feature, usar somente símbolos de Prêmio e posições vazias.
 - [x] Implementar flip/revelação das placas.
 - [x] Acumular ganho da feature.
 - [x] Implementar tela de total.
@@ -313,13 +319,15 @@ Legenda:
 - [x] Criar URL de teste `?demo=feature`.
 - [x] Travar a aposta que ativou a feature durante as oito rodadas grátis.
 - [x] Garantir que as rodadas da feature não descontem saldo.
-- [x] Aplicar somente símbolos de Prêmio em todas as posições.
+- [x] Sortear entre 1 e 10 símbolos de Prêmio por rodada da feature.
+- [x] Pagar a rodada somente quando houver 5 ou mais símbolos de Prêmio.
+- [x] Garantir que pelo menos uma das oito rodadas tenha menos de 5 símbolos e não pague.
 - [x] Limitar o acumulado total da feature a 5.000x a aposta que a ativou.
 - [x] Encerrar imediatamente as rodadas restantes ao atingir o limite de 5.000x.
 - [x] Retomar corretamente a Rodada Automática após a tela de total da feature.
 - [x] Adicionar atmosfera luminosa exclusiva dentro dos rolos da feature.
 - [x] Adicionar abertura visual de cada rodada com contador de 1 a 8.
-- [x] Adicionar painel persistente com rodada atual, progresso e total acumulado.
+- [x] Substituir painel persistente de rodada/total pelo aviso “5 símbolos para ganhar”.
 - [x] Animar a coleta dos prêmios dos rolos em direção ao total acumulado.
 - [x] Dar pulso, aura e brilho próprios às placas de Prêmio da feature.
 - [x] Usar animação comemorativa do mascote na tela final da feature.
